@@ -11,7 +11,7 @@
 ##'@param domain.mask (raster layer) A raster layer specifying the analysis domain
 ##'@param start.year (integer) The earliest year for which data will be retained  Default: 1970.
 ##'@param end.year (integer) The latest year for which data will be retained  Default: 2018
-##'@param spatial.uncertainty.m (float) The distance (m) for spatial uncertainty below which data will be retained. Default: 1000 mts.
+##'@param spatial.uncertainty.m (float) The distance (m) for spatial uncertainty below which data will be retained. Default: 10000 mts.
 ##'@param filter_fields (string) GBIF data fields, i.e. columns, that will be reatined for the purpose of filtering
 ##'@param filter_basisofrecord (string)
 ##'@param issue_geospatial (string) Geospatial issues to exclude from the output dataset. Default: "ZERO_COORDINATE", "COORDINATE_INVALID",
@@ -52,7 +52,7 @@ filter_gbif_raw = function (gbif.downloaded.data,
                              domain.mask = NULL,
                              start.year = 1950,
                              end.year = 2018,
-                             spatial.uncertainty.m = 1000,
+                             spatial.uncertainty.m = 10000,
                              filter_fields = c("gbifid", "occurrenceid", "species", "scientificname", "countrycode",
                                                "decimallatitude", "decimallongitude", "coordinateuncertaintyinmeters",
                                                "coordinateprecision", "elevation", "elevationaccuracy", "depth",
@@ -212,7 +212,7 @@ filter_gbif_raw = function (gbif.downloaded.data,
     msg2 = paste('These data have been also been written to ', output_path)
     msg3 = paste("# records in raw data = ", n.rec.start)
     msg4 = paste("# records in filtered data = ", dim(dat)[1])
-    msg5 = paste("# records removed (including spatial duplicates) =", n.rec.start-dim(dat)[1])
+    msg5 = paste("# records removed =", n.rec.start-dim(dat)[1])
     cat(paste(msg1, msg2, msg3, msg4, msg5, sep = '\n'))
   } # end if(verbose)
 

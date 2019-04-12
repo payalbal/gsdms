@@ -12,7 +12,7 @@
 ##'@param start.year (integer) The earliest year for which data will be retained  Default: 1970.
 ##'@param end.year (integer) The latest year for which data will be retained  Default: 2018
 ##'@param remove_duplicates (boolean) To include or exclude spatial duplicates. Deafult TRUE excludes. 
-##'@param spatial.uncertainty.m (float) Distance (m) threshold applied to field coordinateuncertaintyinmeters if provided for inclusion of records. Default: 1000 mts.
+##'@param spatial.uncertainty.m (float) Distance (m) threshold applied to field coordinateuncertaintyinmeters if provided for inclusion of records. Default: 100000 mts.
 ##'@param filter_fields (string) GBIF data fields, i.e. columns, that will be reatined for the purpose of filtering
 ##'@param filter_basisofrecord (string)
 ##'@param issue_geospatial (string) Geospatial issues to exclude from the output dataset. Default: "ZERO_COORDINATE", "COORDINATE_INVALID",
@@ -46,7 +46,7 @@ filter_gbif_data = function (gbif.downloaded.data,
                              start.year = 1950,
                              end.year = 2018,
                              remove_duplicates = TRUE,
-                             spatial.uncertainty.m = 1000,
+                             spatial.uncertainty.m = 100000,
                              filter_fields = c("gbifid", "species", "scientificname", 
                                                "countrycode", "decimallatitude", 
                                                "decimallongitude", "coordinateuncertaintyinmeters",
@@ -90,17 +90,16 @@ filter_gbif_data = function (gbif.downloaded.data,
   names(dat) <- sapply(names(dat), tolower)
   dat <- dat[, filter_fields, with = FALSE]
   
+  ## Checks - already removed in first filter ------------------------------- ##
   ## Delete records without spatial coordinates
   dat <- na.omit(dat, cols = c("decimallatitude", "decimallongitude"))
-  
   ## Delete records without species name
   dat <- na.omit(dat, cols = "species")
-  
   ## Filter by date range 
   dat <- dat[year >= start.year & year <= end.year]
-  
   ## Filter by basis of record
   dat <- dat[basisofrecord %in% filter_basisofrecord]
+  ## ------------------------------------------------------------------------ ##
   
   ## Filter by issues in data
   dat <- dat[!grep(paste0(c(issue_geospatial,issue_taxonomic, issue_basisofrecord, issue_date), collapse = "|"), dat$issue, perl = TRUE, value = FALSE)]
@@ -123,7 +122,7 @@ filter_gbif_data = function (gbif.downloaded.data,
     dat <- dat[which(decimallatitude > domain.mask@extent@ymin)]
     dat <- dat[which(decimallatitude < domain.mask@extent@ymax)]
     
-    ## Filter by location on spatial grid
+    ## Filter by location on spatial grid (remove points falling outside of mask)
     sp <- SpatialPoints(dat[,.(decimallongitude,decimallatitude)])
     grd.pts<-extract(domain.mask, sp)
     dat <- dat[!is.na(grd.pts),]
