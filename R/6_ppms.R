@@ -7,4 +7,7 @@ Xsamp <- readRDS("./output/designmatrix.rds")
 
 ## Load filtered biodiversity data
 gbif <- read.table("/Volumes/payal_umelb/data/processed/biodiv/2019-04-12_gbif_iucnsp.csv", sep = ",", header = TRUE)
-length(unique(gbif$species))
+length(unique(gbif$species)) 
+
+
+## Fit PPM
