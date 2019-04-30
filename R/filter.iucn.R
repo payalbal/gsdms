@@ -1,4 +1,4 @@
-##'@title filter_iucn_data.R
+##'@title filter.iucn.R
 ##'
 ##'##'@description Filters IUCN spatial data
 ##'
@@ -37,7 +37,7 @@
 ##'@return .txt
 ##'
 
-filter_iucn_data = function(iucn.downloaded.data,
+filter.iucn = function(iucn.downloaded.data,
                            output_folder = NULL,
                            output_name = "filtered_iucn",
                            species_list = TRUE,

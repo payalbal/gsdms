@@ -1,11 +1,12 @@
 ---
-title: "gbif_datacleaning"
-author: "P Bal"
-collaborators: "Casey Visintin, Skip Woolley"
+title: "0_gsdms"
+author: "Payal Bal"
+collaborators: "Casey Visintin (UoM), Skip Woolley (CSIRO), Chris Ware (CSIRO)"
 date: "`r Sys.Date()`"
 output: html_document
-R script file: "gbif-data_processing.R"
+Reference R script files: 
 gbif data citation: "GBIF.org (12th December 2017) GBIF Occurrence Download https://doi.org/10.15468/dl.kaciwi"
+description: "Master script file for global SDMs for the ARC Trade-Biodiversity project"
 ---
 
 <!-- Specify global options for code chunks -->

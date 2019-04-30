@@ -9,7 +9,7 @@ source("R/connect_to_server.R")
 # data_path <- "/Volumes/payal_umelb/data/"
 # source("./R/filter_iucn_data.R")
 # dat <- readOGR(dsn=paste0(data_path, "raw/biodiversity/IUCN/rangemaps/TERRESTRIAL_MAMMALS"), layer = "TERRESTRIAL_MAMMALS")
-# iucn_species <- as.vector(filter_iucn_data(dat, output_folder = "./output", species_list = TRUE))
+# iucn_species <- as.vector(filter.iucn(dat, output_folder = "./output", species_list = TRUE))
 
 
 ## Load IUCN species list created above. 

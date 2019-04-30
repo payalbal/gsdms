@@ -1,6 +1,6 @@
 # Specific files/folders #
 ##########################
-R/explorr/
+R/explore/
 figs/
 output/
 R/connect_to_server.R
