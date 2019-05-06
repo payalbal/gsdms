@@ -1,6 +1,6 @@
 ##'@title filter.iucn.R
 ##'
-##'##'@description Filters IUCN spatial data
+##'@description Filters IUCN spatial data
 ##'
 ##'@param iucn.downloaded.data IUCN spatial data for TERRETRIAL MAMMALS. https://www.iucnredlist.org/resources/spatial-data-download
 ##'@param output_folder (string) A folder to save the outputs to.
@@ -32,27 +32,29 @@
 ##'                         6-presence uncertain
 ##'                         Default: possibly extinct,extinct post1500,
 ##'                         presence uncertain
+##'@param write_file (boolean) To write text file to disk. Defult TRUE.                         
 ##'@param verbose (boolean) Print messages to console. Default TRUE.
 ##'
 ##'@return .txt
 ##'
 
 filter.iucn = function(iucn.downloaded.data,
-                           output_folder = NULL,
-                           output_name = "filtered_iucn",
-                           species_list = TRUE,
-                           filter_fields = c("id_no", "binomial", "presence", "origin", 
-                                             "seasonal", "year","kingdom","phylum",
-                                             "class", "order_","family","genus", "code",
-                                             "marine","terrestial","freshwater",
-                                             "shape_Leng", "shape_Area"),
-                           filter_code = c("VU", "EN", "CR"),
-                           subspecies = FALSE,
-                           marine = FALSE,
-                           freshwater = FALSE,
-                           filter_origin = c("native"),
-                           extinct = FALSE,
-                           verbose = TRUE)
+                       output_folder = NULL,
+                       output_name = "filtered_iucn",
+                       species_list = TRUE,
+                       filter_fields = c("id_no", "binomial", "presence", "origin", 
+                                         "seasonal", "year", "class", "order_",
+                                         "family","genus", "code",
+                                         "marine","terrestial","freshwater",
+                                         "shape_Leng", "shape_Area"),
+                       filter_code = c("VU", "EN", "CR"),
+                       subspecies = FALSE,
+                       marine = FALSE,
+                       freshwater = FALSE,
+                       filter_origin = c("native"),
+                       extinct = FALSE,
+                       write_file = TRUE,
+                       verbose = TRUE)
 {
   
   ## Read in the data
@@ -60,9 +62,6 @@ filter.iucn = function(iucn.downloaded.data,
   
   ## Catch the original number of records 
   n.rec.start <- nrow(dat)
-  
-  ## Drop unwanted columns
-  dat <- dat[, c(filter_fields)]
   
   ## Filter data threatened status: include VU, EN, CR; exclude EW, EX, DD, NT, LC
   dat <- dat[which(dat$code %in% filter_code),]
@@ -81,7 +80,7 @@ filter.iucn = function(iucn.downloaded.data,
     dat <- dat[which(dat$freshwater == "f"),]
   }
   
-  # Filter by origin
+  ## Filter by origin
   if(!is.null(filter_origin)){
     filter_origin[filter_origin == "native"] <- 1
     filter_origin[filter_origin == "reintroduced"] <- 2
@@ -100,36 +99,47 @@ filter.iucn = function(iucn.downloaded.data,
   }
   
   ## Output
-  if(!is.null(output_folder)) {
-    if(!dir.exists(output_folder))
-    {
-      warning("output folder not provided")
-    }
-    output_path <- file.path(output_folder,paste0(Sys.Date(), "_", output_name,".txt"))
-    
-    if (species_list == TRUE) {
-      outdata <- as.data.frame(unique(dat$binomial))
-      write.table(outdata, output_path,  row.names = FALSE, col.names = FALSE)
-      
+  if (species_list == TRUE) {
+    outdata <- as.data.frame(unique(dat$binomial))
+  } else {
+    outdata <- dat[, c(filter_fields)]
+  }
+  
+  ## Generate output messages
+  msg1 = paste('Returned object is a text file of dimensions =', dim(outdata)[1], 
+               "rows and ", dim(outdata)[2], "columns")
+  msg2 = paste("# records in raw data = ", n.rec.start)
+  msg3 = paste("# records in filtered data = ", dim(dat)[1])
+  msg4 = paste("# records removed (including spatial duplicates) =", n.rec.start-dim(dat)[1])
+  msg5 = paste("# unique species in filtered data =", length(unique(dat$binomial)))
+  
+  
+  ## Write file
+  if(write_file == TRUE) {
+    if(!is.null(output_folder)) {
+      if(!dir.exists(output_folder))
+      {
+        warning("output folder specified does not exist")
+      } else {
+        output_path <- file.path(output_folder,paste0(Sys.Date(), "_", output_name,".txt"))
+        write.table(outdata, output_path,  row.names = FALSE, col.names = FALSE)
+        if(verbose)
+        {
+          msg0 = paste('Data written to ', output_path, 'as ', paste0(Sys.Date(), "_", output_name,".txt"))
+          cat(paste(msg0, msg1, msg2, msg3, msg4, msg5, sep = '\n')) # write some feedback to the terminal
+        }
+      }
     } else {
-      outdata <- dat
-      write.table(dat, output_path,  row.names = FALSE, col.names = FALSE)
+      warning("\n output folder not provided")
     }
   }
   
-  # write some feedback to the terminal
+  ## Return output
+  return(outdata)
   if(verbose)
   {
-    msg1 = paste('Returned object is a text file of dimensions =', dim(outdata)[1], 
-                 "rows and ", dim(outdata)[2], "columns")
-    msg2 = paste('These data have been also been written to ', output_path)
-    msg3 = paste("# records in raw data = ", n.rec.start)
-    msg4 = paste("# records in filtered data = ", dim(dat)[1])
-    msg5 = paste("# records removed (including spatial duplicates) =", n.rec.start-dim(dat)[1])
-    msg6 = paste("# unique species in filtered data =", length(unique(dat$binomial)))
-    cat(paste(msg1, msg2, msg3, msg4, msg5, msg6, sep = '\n'))
-  } # end if(verbose)
-  
-  return(outdata)
+    cat(paste(msg1, msg2, msg3, msg4, msg5, sep = '\n')) # write some feedback to the terminal
+  }
 }
+
 

@@ -20,9 +20,9 @@ library(tools)
 # library(progress)
 
 ## Data paths
-data_raw <- "/Volumes/payal_umelb/data/raw"
+data_raw <- "/Volumes/discovery_data/data/raw"
 # dir.create("/Volumes/payal_umelb/data/gsdms/")
-data_gsdms <- "/Volumes/payal_umelb/data/gsdms"
+data_gsdms <- "/Volumes/discovery_data/data/gsdms"
 
 
 
@@ -170,29 +170,41 @@ rm(list=setdiff(ls(), c("data_gsdms", "covariates_all", "global_mask")))
 crs(covariates_all) <- crs(global_mask)
 covariates_all <- mask(covariates_all, global_mask)
 names(covariates_all) <- sub("_treated","", names(covariates_all))
-saveRDS(covariates_all, file = paste0(data_gsdms, "/covariates_all.rds"))
+# saveRDS(covariates_all, file = paste0(data_gsdms, "/covariates_all.rds"))
 
 
 
 
 ## SUBSET COVARIATES
-## Subset bioclim bvariables 
+## Subset  bvariables 
 covariates_all <- readRDS(paste0(data_gsdms, "/covariates_all.rds"))
-cov_keep <- names(covariates_all)[grep('bio1$|bio4$|01$|04$|12$|14$', names(covariates_all))]
+cov_keep <- names(covariates_all)[grep('bio1$|bio4$|bio12$|bio15$', names(covariates_all))]
 cov_keep <- c(cov_keep, c("bulkdens","pawc","soilcarb","totaln",
                           "srtm","slope","roughness","aspect","landuse"))
 covariates <- covariates_all[[which(names(covariates_all) %in% cov_keep)]]
 rm(cov_keep, covariates_all)
 
-
-
-## Subset based on correlation in covariates...incomplete
-covar_values <- getValues(covariates)
+## Test correlation in covariate
 corr1 <- layerStats(covariates, stat = 'pearson', na.rm = TRUE)
-corr2 <- cor(covar_values, use = 'complete.obs', method = 'pearson') 
-## outputs are different, why?
+cov_values <- getValues(covariates)
+corr2 <- cor(cov_values, use = 'complete.obs', method = 'pearson') 
+rm(cov_values)
+
+## Visulaisation
+library(corrplot)
+library(mnormt); library(psych)
+library(reshape); library(GGally)
+corrplot::corrplot(corr1$`pearson correlation coefficient`, type = "upper")
+corrplot::corrplot(corr1$`pearson correlation coefficient`, type = "upper", method = "number")
+corrplot::corrplot(corr2, type = "upper", method = "number")
+psych::pairs.panels(corr1$`pearson correlation coefficient`, scale = TRUE)
+GGally::ggpairs(as.data.frame(corr1$`pearson correlation coefficient`)) # don't like this. Slow and affiliated to ggplot.
 
 
+## Remove highly correlated covariates (> 0.8)
+'%!in%' <- function(x,y)!('%in%'(x,y))
+covariates <- covariates[[which(names(covariates) %!in% c("bio4", "totaln", "roughness"))]]  
+# saveRDS(covariates, file = "./output/covariates.rds")
 
 ## -----------------------------------------------------------------------------
 

@@ -1,9 +1,9 @@
 # Specific files/folders #
 ##########################
 R/explore/
-figs/
 output/
 R/connect_to_server.R
+figs/
 
 # R files #
 ###########

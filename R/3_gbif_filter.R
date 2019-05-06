@@ -7,7 +7,7 @@
 library(pacman)
 p_load(DBI, RPostgreSQL, data.table, sp, raster)
 
-data_path <- "/Volumes/payal_umelb/data/"
+data_path <- "/Volumes/discovery_data/data/"
 backbone <-fread(paste0(data_path, "raw/", "biodiversity/GBIF/backbone/Taxon.tsv"))
 global_mask <- raster(paste0(data_path, "processed/", "global_mask.tif"))
 

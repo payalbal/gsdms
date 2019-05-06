@@ -6,8 +6,8 @@ p_load(DBI, RPostgreSQL, foreach, iterators, parallel, doParallel, doMC)
 source("R/connect_to_server.R")
 
 ## Get IUCN species list
-# data_path <- "/Volumes/payal_umelb/data/"
-# source("./R/filter_iucn_data.R")
+# data_path <- "/Volumes/discovery_data/data/"
+# source("./R/filter.iucn.R")
 # dat <- readOGR(dsn=paste0(data_path, "raw/biodiversity/IUCN/rangemaps/TERRESTRIAL_MAMMALS"), layer = "TERRESTRIAL_MAMMALS")
 # iucn_species <- as.vector(filter.iucn(dat, output_folder = "./output", species_list = TRUE))
 
