@@ -144,8 +144,8 @@ filter.gbif = function (gbif.downloaded.data,
   if(!is.null(subset.gbifnubtaxonomy.byclass)){
     gbif.nub.taxonomy <- gbif.nub.taxonomy[class==subset.gbifnubtaxonomy.byclass]
   } else {
-    dat_species_list <- unique(dat$species)
-    check_list <- dat_species_list[which(!(dat_species_list %in% unique(gbif.nub.taxonomy$canonicalName)), arr.ind = TRUE)]
+    species_list <- unique(dat$species)
+    check_list <- species_list[which(!(species_list%in% unique(gbif.nub.taxonomy$canonicalName)), arr.ind = TRUE)]
     if(!identical(check_list, character(0))){
       dat <- dat[!species %in% check_list]
     } # end !identical(check_list, character(0))    ## cannot catch character(0) with is.null

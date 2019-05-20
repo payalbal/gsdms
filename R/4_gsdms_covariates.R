@@ -22,8 +22,8 @@ library(tools)
 ## Data paths
 data_raw <- "/Volumes/discovery_data/data/raw"
 # dir.create("/Volumes/payal_umelb/data/gsdms/")
-data_gsdms <- "/Volumes/discovery_data/data/gsdms"
-
+data_gsdms_in <- "/Volumes/discovery_data/data/gsdms_data/covariates"
+data_gsdms <- "/Volumes/discovery_data/data/gsdms_data"
 
 
 ## DOWNLOAD DATA
@@ -60,16 +60,13 @@ data_gsdms <- "/Volumes/discovery_data/data/gsdms"
   #     }
   #   }
   # }
-  # rm(list=setdiff(ls(), c("data_raw", "data_gsdms")))
+  # rm(list=setdiff(ls(), c("data_raw", "data_gsdms_in")))
 
 bio_current <- list.files(paste0(data_raw, "/climate/wc10"), pattern = '.bil$', full.names = TRUE)
-files <- list.files(paste0(data_raw, "/climate/cmip5/10m"),full.names = TRUE)
-bio_rcp26 <- files[grepl(paste0("(?=.*26)(?=.*tif)"), files, perl = TRUE)]
-bio_rcp85 <- files[grepl(paste0("(?=.*85)(?=.*tif)"), files, perl = TRUE)]
+bio_future <- list.files(paste0(data_raw, "/climate/cmip5/10m"),full.names = TRUE)
+bio_rcp26 <- bio_future[grepl(paste0("(?=.*26)(?=.*tif)"), bio_future, perl = TRUE)]
+bio_rcp85 <- bio_future[grepl(paste0("(?=.*85)(?=.*tif)"), bio_future, perl = TRUE)]
 bioclim <- c(bio_current, bio_rcp26, bio_rcp85)
-
-
-## Subset bioclim variables based on correlation. Here or after layer processing.
 
 
 ## SRTM: http://srtm.csi.cgiar.org/srtmdata/ 
@@ -109,13 +106,13 @@ landuse <- paste0(data_raw,"/landcover/USGS_GLCC/glccgbe20_tif_geoproj/gbigbpgeo
 
 ## DATA PROCESSING
 ## Create Mask from WorldClim layer
-global_mask <- raster(paste0(data_raw, "/climate/wc10/bio1.bil"))
+global_mask <- raster(paste0(data_raw, "/climate/wc10/bio1.bil")) # 10min resolution ~ 345km2
 global_mask[which(!is.na(global_mask[]))] <- 1
 
 
 ## sense::gdal_crop
 file_in <- c(bioclim, srtm, soil, landuse)
-file_out <- paste0(data_gsdms, "/", paste0(tools::file_path_sans_ext(basename(file_in)), "_treated.", tools::file_ext(file_in)))
+file_out <- paste0(data_gsdms_in, "/", paste0(tools::file_path_sans_ext(basename(file_in)), "_treated.", tools::file_ext(file_in)))
 
 e <- c(-180,180,-60,90)
 reso <- res(global_mask)
@@ -128,11 +125,13 @@ landusefile <- file_out[grep(file_path_sans_ext(basename(file_in[grep("landcover
 file.rename(landusefile, sub(file_path_sans_ext(basename(landusefile)),"landuse_treated", landusefile))
 
 ## SRTM variables
-file_out <- list.files(data_gsdms, full.names = TRUE)
+file_out <- list.files(data_gsdms_in, full.names = TRUE)
 elevation <- raster(file_out[grep("srtm", file_out)])
+  # elevation <- mask(elevation, global_mask)
+  # elev_temp <- elevation; elev_temp[is.na(elev_temp)] <- 0
+aspect <- terrain(elevation, opt = "aspect")
 slope <- terrain(elevation, opt = 'slope')
 roughness <- terrain(elevation, opt = "roughness")
-aspect <- terrain(elevation, opt = "aspect")
 
 
 ## Landuse reclassification (as per SK's code)
@@ -165,13 +164,21 @@ landuse <- landuse/100 - 1 ## these steps ensure that substituted alues do not o
 
 
 ## SAVE COVARIATES AS RDS
-covariates_all <- stack(setdiff(file_out, file_out[grep("srtm|landuse", file_out)]), elevation, slope, roughness, aspect, landuse)
-rm(list=setdiff(ls(), c("data_gsdms", "covariates_all", "global_mask")))
+covariates_all <- stack(setdiff(file_out, file_out[grep("srtm|landuse", file_out)]), 
+                        elevation, slope, roughness, aspect, landuse) 
+  ## load and stack covariates files, excluding files for srtm and landuse
+  ##  which were updated and therefore these rasters are loaded from memory.
+rm(list=setdiff(ls(), c("data_gsdms_in", "covariates_all", "global_mask")))
 crs(covariates_all) <- crs(global_mask)
 covariates_all <- mask(covariates_all, global_mask)
 names(covariates_all) <- sub("_treated","", names(covariates_all))
-# saveRDS(covariates_all, file = paste0(data_gsdms, "/covariates_all.rds"))
 
+  ## Check to see same number of NAS in covariates as in global mask
+summary(global_mask)
+summary(covariates_all)
+
+
+# saveRDS(covariates_all, file = paste0(data_gsdms, "/covariates_all.rds"))
 
 
 
@@ -182,7 +189,6 @@ cov_keep <- names(covariates_all)[grep('bio1$|bio4$|bio12$|bio15$', names(covari
 cov_keep <- c(cov_keep, c("bulkdens","pawc","soilcarb","totaln",
                           "srtm","slope","roughness","aspect","landuse"))
 covariates <- covariates_all[[which(names(covariates_all) %in% cov_keep)]]
-rm(cov_keep, covariates_all)
 
 ## Test correlation in covariate
 corr1 <- layerStats(covariates, stat = 'pearson', na.rm = TRUE)
@@ -206,13 +212,31 @@ GGally::ggpairs(as.data.frame(corr1$`pearson correlation coefficient`)) # don't 
 covariates <- covariates[[which(names(covariates) %!in% c("bio4", "totaln", "roughness"))]]  
 # saveRDS(covariates, file = "./output/covariates.rds")
 
-## -----------------------------------------------------------------------------
+
+
+## FUTURE CLIMATE LAYERS
+rm(cov_keep)
+cov_keep <- names(covariates_all)[grep('26|85', names(covariates_all))]
+cov_keep <- cov_keep[grep('701$|704$|7012$|7015$', cov_keep)]
+cov_keep <- c(cov_keep, c("bulkdens","pawc","soilcarb","totaln",
+                          "srtm","slope","roughness","aspect","landuse"))
+covariates_predict <- covariates_all[[which(names(covariates_all) %in% cov_keep)]]
+## Remove same variables as for covariates because prediction matrix and design matrix shoudl be the same for ppms
+covariates_predict <- covariates_predict[[which(names(covariates_predict) %!in% c("bc26bi704" ,"bc85bi704","totaln", "roughness"))]]  
+saveRDS(covariates_predict, file = "./output/covariates_predict.rds")
+
+
+
+
+
+
+# -----------------------------------------------------------------------------
 
   # ## OTHER 'SENSE' FUNCTIONS
   # ## gdal_mask - NOT REQUIRED. BUT WORKS. 
   # global_mask[which(is.na(global_mask[]))] <- 0   #gdal_mask requires mask with 0s for mask and 1s for keep 
   # writeRaster(global_mask, paste0(data_processed, "/global_mask01.tif"))
-  # file_in <- list.files(data_gsdms, full.names = TRUE)
+  # file_in <- list.files(data_gsdms_in, full.names = TRUE)
   # file_out <- sub("_treated", "_v2", file_in)
   # mapply(gdal_mask, inpath = file_in, outpath = file_out, MoreArgs = list(mask = paste0(data_processed, "/global_mask01.tif")))
   # 

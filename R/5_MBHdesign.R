@@ -5,54 +5,14 @@ library(raster)
 # install.packages( "MBHdesign")
 library(MBHdesign)
 
-data_raw <- "/Volumes/payal_umelb/data/raw"
-data_gsdms <- "/Volumes/payal_umelb/data/gsdms"
+data_raw <- "/Volumes/discovery_data/data/raw"
+data_gsdms <- "/Volumes/discovery_data/data/gsdms"
 
 
-## Define inclusion probabilities as 0 for NA and 1 for non-NA values in global mask
+## Load mask
 global_mask <- raster(paste0(data_raw, "/climate/wc10/bio1.bil"))
 global_mask[which(!is.na(global_mask[]))] <- 1
-global_mask[which(is.na(global_mask[]))] <- 0
-InclProb <- as.matrix(global_mask)
-  ## Checks: 
-  sum(is.na(values(global_mask))) # to check for NA values.
-  print(paste0("# ones in global mask = ", sum(values(global_mask) == 1)))
-  print(paste0("# zeros in global mask = ", sum(values(global_mask) == 0)))
-  print(paste0("check that total # cells in global mask is equal to the sum of ones and zeros : ",
-               length(global_mask@data@values) == sum(values(global_mask) == 1)
-               + sum(values(global_mask) == 0)))
-
-
-## Load covariates
-covariates_all <- readRDS(paste0(data_gsdms, "/covariates_all.rds"))
-cov_keep <- names(covariates_all)[grep('bio1$|bio4$|bio12$|bio15$', names(covariates_all))]
-cov_keep <- c(cov_keep, c("bulkdens","pawc","soilcarb","totaln",
-                          "srtm","slope","roughness","aspect","landuse"))
-covariates <- covariates_all[[which(names(covariates_all) %in% cov_keep)]]
-rm(cov_keep, covariates_all)
-# saveRDS(covariates, file = "./output/covariates.rds")
-# covariates <- readRDS("./output/covariates.rds")
-
-## Test correlation in covariate
-corr1 <- layerStats(covariates, stat = 'pearson', na.rm = TRUE)
-cov_values <- getValues(covariates)
-corr2 <- cor(cov_values, use = 'complete.obs', method = 'pearson') 
-rm(cov_values)
-
-## Visulaisation
-library(corrplot)
-library(mnormt); library(psych)
-library(reshape); library(GGally)
-corrplot::corrplot(corr1$`pearson correlation coefficient`, type = "upper")
-corrplot::corrplot(corr1$`pearson correlation coefficient`, type = "upper", method = "number")
-corrplot::corrplot(corr2, type = "upper", method = "number")
-psych::pairs.panels(corr1$`pearson correlation coefficient`, scale = TRUE)
-GGally::ggpairs(as.data.frame(corr1$`pearson correlation coefficient`)) # don't like this. Slow and affiliated to ggplot.
-
-
-## Remove highly correlated covariates (> 0.8)
-'%!in%' <- function(x,y)!('%in%'(x,y))
-covariates <- covariates[[which(names(covariates) %!in% c("bio4", "totaln", "roughness"))]]  
+global_mask[which(is.na(global_mask[]))] <- NA
 
 
 ## Define sampling grid
@@ -67,11 +27,22 @@ cov_values <- as.matrix(covariates)
   summary(cov_values)
   summary(covariates)
 
-X <- cbind(X, cov_values)
+X <- cbind(X, complete.cases(cov_values))
   ## Check - that 0 mask values align with NA values in covariates: yes
 X <- X[,-1]
 rm(cov_values, rpts)
 
+
+## Define inclusion probabilities as 0 for NA and 1 for non-NA values in global mask
+global_mask[which(is.na(global_mask[]))] <- 0
+InclProb <- as.matrix(global_mask)
+## Checks: 
+sum(is.na(values(global_mask))) # to check for NA values.
+print(paste0("# ones in global mask = ", sum(values(global_mask) == 1)))
+print(paste0("# zeros in global mask = ", sum(values(global_mask) == 0)))
+print(paste0("check that total # cells in global mask is equal to the sum of ones and zeros : ",
+             length(global_mask@data@values) == sum(values(global_mask) == 1)
+             + sum(values(global_mask) == 0)))
   
 ## Qausi random sample ... Gives error (see details below). FIX LATER
   # library(rgdal)
