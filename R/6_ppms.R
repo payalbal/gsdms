@@ -197,7 +197,7 @@ mc.cores <- 1
 seq_along(spp)
 model_list <- parallel::mclapply(1:5, fit_ppms_apply, spdat, #spwts,
                            bkdat, bkwts, interaction_terms, ppm_terms,
-                           n.fits=5, mc.cores = mc.cores)
+                           n.fits=100, mc.cores = mc.cores)
 
 predict_ppms_apply <- function(i, models_list, newdata, bkdat, RCPs = c(26, 85)){
   
@@ -232,13 +232,18 @@ prediction_list <- parallel::mclapply(seq_along(model_list), predict_ppms_apply,
 
 # Prediction for sp1
 preds_sp1 <- rasterFromXYZ(cbind(predxyz[,1:2],prediction_list[[1]]))
-plot(preds_sp1[[1]])
+plot(preds_sp1[[1]],main=spp[1])
 points(spdat[spdat$species==spp[1],c(4,3)],pch=16,cex=.5)
 
 # Prediction for sp2
 preds_sp2 <- rasterFromXYZ(cbind(predxyz[,1:2],prediction_list[[2]]))
-plot(preds_sp2[[1]])
+plot(preds_sp2[[1]],main=spp[2])
 points(spdat[spdat$species==spp[2],c(4,3)],pch=16,cex=.5)
+
+# Prediction for sp3
+preds_sp3 <- rasterFromXYZ(cbind(predxyz[,1:2],prediction_list[[3]]))
+plot(preds_sp3[[1]],main=spp[3])
+points(spdat[spdat$species==spp[3],c(4,3)],pch=16,cex=.5)
 
 # Ect ect ect
 
