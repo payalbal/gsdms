@@ -21,7 +21,6 @@ library(tools)
 
 ## Data paths
 data_raw <- "/Volumes/discovery_data/data/raw"
-# dir.create("/Volumes/payal_umelb/data/gsdms/")
 data_gsdms_in <- "/Volumes/discovery_data/data/gsdms_data/covariates"
 data_gsdms <- "/Volumes/discovery_data/data/gsdms_data"
 
@@ -108,6 +107,7 @@ landuse <- paste0(data_raw,"/landcover/USGS_GLCC/glccgbe20_tif_geoproj/gbigbpgeo
 ## Create Mask from WorldClim layer
 global_mask <- raster(paste0(data_raw, "/climate/wc10/bio1.bil")) # 10min resolution ~ 345km2
 global_mask[which(!is.na(global_mask[]))] <- 1
+# writeRaster(global_mask, filename = paste0(data_gsdms, "/globalmask10m.tif"))
 
 
 ## sense::gdal_crop
@@ -118,17 +118,17 @@ e <- c(-180,180,-60,90)
 reso <- res(global_mask)
 mapply(gdal_crop, inpath = file_in, outpath = file_out, MoreArgs = list(extent=e,res=reso)) 
 
+
 ## Rename files
 srtmfile <- file_out[grep(file_path_sans_ext(basename(file_in[grep("srtm", file_in)])), file_out)]
 file.rename(srtmfile, sub(file_path_sans_ext(basename(srtmfile)),"srtm_treated", srtmfile))
 landusefile <- file_out[grep(file_path_sans_ext(basename(file_in[grep("landcover", file_in)])), file_out)]
 file.rename(landusefile, sub(file_path_sans_ext(basename(landusefile)),"landuse_treated", landusefile))
 
+
 ## SRTM variables
 file_out <- list.files(data_gsdms_in, full.names = TRUE)
 elevation <- raster(file_out[grep("srtm", file_out)])
-  # elevation <- mask(elevation, global_mask)
-  # elev_temp <- elevation; elev_temp[is.na(elev_temp)] <- 0
 aspect <- terrain(elevation, opt = "aspect")
 slope <- terrain(elevation, opt = 'slope')
 roughness <- terrain(elevation, opt = "roughness")
@@ -162,12 +162,14 @@ landuse[landuse[]%in%c(0, 11,15,16,17)] <- 500
 landuse <- landuse/100 - 1 ## these steps ensure that substituted alues do not overlap wth existing values
 
 
-
-## SAVE COVARIATES AS RDS
+## COMPARE COVARIATES FOR NAS AND REMOVE NAS
 covariates_all <- stack(setdiff(file_out, file_out[grep("srtm|landuse", file_out)]), 
                         elevation, slope, roughness, aspect, landuse) 
   ## load and stack covariates files, excluding files for srtm and landuse
   ##  which were updated and therefore these rasters are loaded from memory.
+
+
+## SAVE COVARIATES AS RDS
 rm(list=setdiff(ls(), c("data_gsdms_in", "covariates_all", "global_mask")))
 crs(covariates_all) <- crs(global_mask)
 covariates_all <- mask(covariates_all, global_mask)

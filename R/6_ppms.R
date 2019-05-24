@@ -1,6 +1,8 @@
 #'@title PPM models
 #'
 #'@description Fit PPMs using GBIF data for IUCN listed species
+#'GitHub: https://github.com/payalbal/gsdms/blob/master/R/6_ppms.R
+#'
 #'
 
 
@@ -14,12 +16,12 @@ p_load(sp, raster, spatstat.data, nlme, rpart, spatstat, ppmlasso,
 
 
 ## Copy required files to an 'output' folder
-if(!dir.exists("./output")) {
-  dir.create("./output")
-}
-current.folder <- "provide path to downloaded files"
-ppm_files <- paste0(current.folder, c("covariates.rds", "covariates_predict.rds", "bio1.bil", "bio1.hdr", "2019-05-14_gbif_iucnsp.csv"))
-file.copy(ppm_files, "./output/")
+# if(!dir.exists("./output")) {
+#   dir.create("./output")
+# }
+# current.folder <- "provide path to downloaded files"
+# ppm_files <- paste0(current.folder, c("covariates.rds", "covariates_predict.rds", "bio1.bil", "bio1.hdr", "2019-05-14_gbif_iucnsp.csv"))
+# file.copy(ppm_files, "./output/")
 
 
 ## Load covariates
@@ -198,30 +200,4 @@ cat(paste("\nPPMS fitted for:\n " , paste0(temp, collapse = ", "), "\n"),
 ## Clear workspace
 rm(list=ls())
 gc()
-
-
-
-
-## CHECK 1 : Count occurrence points falling off the mask (edge) - Run on boab
-# out <-data.frame(matrix(NA, length(gbif_sp), 5))
-# colnames(out) <- c("# records", "extract", "extract.by.buffer", "extract.by.bilinear", "NAcovariates")
-# for (i in 1:length(gbif_sp)) {
-#   spxy <- gbif[gbif$species == gbif_sp[i], c(4,3)]
-#   out[i,1] <- dim(spxy)[1]
-#   spxyz1 <- extract(covariates, spxy)
-#   out[i,2] <- sum(rowSums(is.na(spxyz1))!=0)
-#   spxyz2 <- extract(covariates, spxy, buffer = 1000000, small = TRUE, fun = mean, na.rm = TRUE)
-#   out[i,3] <- sum(rowSums(is.na(spxyz2))!=0)
-#   spxyz3 <- extract(covariates, spxy, method = 'bilinear')
-#   out[i,4] <- sum(rowSums(is.na(spxyz3))!=0)
-#   out[i,5] <- paste(dimnames(spxyz1)[[2]][colSums(is.na(spxyz1)) != 0], collapse = ", ")
-# }
-# out$species <- gbif_sp
-# out
-# saveRDS(out, file="NNAcounts.rds")
-
-## Note: extracting by buffer gets rid of more NAs than by using bilinear method, 
-##  because buffer considers larger area around the point
-
-readRDS(".output/NAcounts.rds")
 
