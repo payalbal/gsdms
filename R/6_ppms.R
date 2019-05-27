@@ -194,7 +194,7 @@ bkwts <- bkgrd_wts
 spp <- levels(factor(spdat$species))
 mc.cores <- 1
 seq_along(spp)
-model_list <- parallel::mclapply(1:5, fit_ppms_apply, spdat, #spwts,
+model_list <- parallel::mclapply(1:length(spp), fit_ppms_apply, spdat, #spwts,
                            bkdat, bkwts, interaction_terms, ppm_terms,
                            n.fits=100, mc.cores = mc.cores)
 
