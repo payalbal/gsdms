@@ -179,9 +179,9 @@ names(covariates_all) <- sub("_treated","", names(covariates_all))
 summary(global_mask)
 summary(covariates_all)
 
-
 # saveRDS(covariates_all, file = paste0(data_gsdms, "/covariates_all.rds"))
 
+## -----------------------------------------------------------------------------
 
 
 ## SUBSET COVARIATES

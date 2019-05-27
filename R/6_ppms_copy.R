@@ -25,12 +25,12 @@ p_load(sp, raster, spatstat.data, nlme, rpart, spatstat, ppmlasso,
 
 
 ## Load covariates
-covariates <- readRDS("./output/covariates.rds")
-covariates_predict <- readRDS("./output/covariates_predict.rds")
+covariates <- readRDS("./data/covariates.rds")
+covariates_predict <- readRDS("./data/covariates_predict.rds")
 
 
 ## Load mask
-global_mask <- raster("./bio1.bil") 
+global_mask <- raster("./data/bio1.bil") 
   ## global_mask <- raster::raster("/Volumes/discovery_data/data/raw/climate/wc10/bio1.bil")
 global_mask[which(!is.na(global_mask[]))] <- 1
 global_mask[which(is.na(global_mask[]))] <- 0
@@ -63,7 +63,7 @@ predxyz <- predxyz[sample(nrow(predxyz), 500000), ]
 
 
 ## Load filtered biodiversity data
-gbif <- read.table("./output/2019-05-14_gbif_iucnsp.csv", sep = ",", 
+gbif <- read.table("./data/2019-05-14_gbif_iucnsp.csv", sep = ",", 
                    header = TRUE)
 gbif_sp <- as.vector(unique(gbif$species)) 
 
