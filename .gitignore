@@ -1,9 +1,10 @@
 # Specific files/folders #
 ##########################
-R/explore/
+R/trialscripts/
 output/
 R/connect_to_server.R
 figs/
+data/
 
 # R files #
 ###########
