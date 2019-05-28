@@ -154,14 +154,14 @@ dbSendQuery(con,"
               ")
   
   ## Check rows
-  as.numeric(dbGetQuery(con,"
-                        SELECT reltuples::bigint AS estimate
-                        FROM pg_class
-                        WHERE  oid = 'gbif.filtered'::regclass;
-                        "))
+  dbGetQuery(con,"
+                SELECT reltuples::bigint AS estimate
+                FROM pg_class
+                WHERE  oid = 'gbif.filtered'::regclass;
+                ")
   
   ## Check that NOT NULL lat long values == number of rows
-  as.numeric(dbGetQuery(con,"
+  dbGetQuery(con,"
               SELECT *
               FROM gbif.temp
               WHERE decimallatitude IS NOT NULL

@@ -59,7 +59,6 @@ predxyz <- na.omit(cbind(predxyz, as.matrix(covariates_predict)))
   # the pred error you where getting was because there was different names between the fitted data and the predict data you had:
   ## "ppmxyz$X" not "X" so the model was just returning the fitted values from the ppmlasso model.
 ppm_terms <- names(backxyz)[1:length(names(backxyz))-1]
-RCPs <- c(26, 85)
 
 
 ## Specify covariates with interactions
@@ -164,7 +163,7 @@ fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms,
                                              ", degree = 2, raw = FALSE)",collapse =""))
     } else  {
       extra_covar <- ceiling((nk - 5)/2)
-      if(extra_covar>8) extra_covar <- 8
+      if(extra_covar > 8) extra_covar <- 8
       ppmform <- formula(paste0(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
                                        ", degree = 2, raw = FALSE)"), 
                                 paste0(" + poly(", ppm_terms[!(ppm_terms %in% interaction_terms)][1:extra_covar],
@@ -188,6 +187,7 @@ fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms,
   
 }
 
+## Fit models and save output
 spdat <- gbif
 bkdat <- backxyz200k
 bkwts <- bkgrd_wts
@@ -198,56 +198,76 @@ model_list <- parallel::mclapply(1:length(spp), fit_ppms_apply, spdat, #spwts,
                            bkdat, bkwts, interaction_terms, ppm_terms,
                            n.fits=100, mc.cores = mc.cores)
 
+## Catch errors in model_list
+errorfile <- paste0("./output/errorfile_", gsub("-", "", Sys.Date()), ".txt")
+for(i in 1:length(model_list)){
+  if(class(model_list[[i]]) == "try-error") {
+    print(paste0("Model ",i, " for '", spp[i], "' has errors"))
+    cat(paste(i, spp[i], "\n"),
+        file = errorfile, append = T)
+    model_list[[i]] <- NULL ## remove model from list
+  }
+}
 
 saveRDS(model_list, file = paste0("./output/modlist_",  gsub("-", "", Sys.Date()), ".rds"))
+
 
 ## Function: PPM predictions
 predict_ppms_apply <- function(i, models_list, newdata, bkdat, RCPs = c(26, 85)){
   
   cat('Predicting ', i,'^th model\n')
   
-  if(class(models_list)== "try-error") return(NULL)
-  
-  predmu <- list()
-  for (rcp in RCPs) {
-    if (rcp == 26) {
-      preddat <- newdata[which(names(newdata) %in% 
-                                 names(newdata)[-grep('85', names(newdata))])]
-      names(preddat) <- names(bkdat)[1:(length(names(bkdat))-2)]
-      predmu$rcp26 <- predict.ppmlasso(model_list[[i]], newdata = preddat)
-      # predmu <- 1-exp(-predmu) ## gives reative probabilities
-      
-    } else {
-      preddat <- newdata[which(names(newdata) %in% 
-                                 names(newdata)[-grep('26', names(newdata))])]
-      names(preddat) <- names(bkdat)[1:(length(names(bkdat))-2)]
-      predmu$rcp85 <- predict.ppmlasso(model_list[[i]], newdata = preddat)
-      # predmu <- 1-exp(-predmu) ## gives reative probabilities
+  if(class(models_list)== "try-error") {
+    return(NULL)
+  } else {
+    
+    predmu <- list()
+    for (rcp in RCPs) {
+      if (rcp == 26) {
+        preddat <- newdata[which(names(newdata) %in% 
+                                   names(newdata)[-grep('85', names(newdata))])]
+        names(preddat) <- names(bkdat)[1:(length(names(bkdat))-2)]
+        predmu$rcp26 <- predict.ppmlasso(models_list[[i]], newdata = preddat)
+        # predmu <- 1-exp(-predmu) ## gives reative probabilities
+        
+      } else {
+        preddat <- newdata[which(names(newdata) %in% 
+                                   names(newdata)[-grep('26', names(newdata))])]
+        names(preddat) <- names(bkdat)[1:(length(names(bkdat))-2)]
+        predmu$rcp85 <- predict.ppmlasso(models_list[[i]], newdata = preddat)
+        # predmu <- 1-exp(-predmu) ## gives reative probabilities
+      }
+      rm(preddat)
     }
-    rm(preddat)
+    return(predmu)
   }
-  return(predmu)
 }
 
+## Predict and save output
 newdata <- predxyz
+bkdat <- backxyz200k
+RCPs <- c(26, 85)
+mc.cores <- 1
 prediction_list <- parallel::mclapply(seq_along(model_list), predict_ppms_apply,
                                       model_list, newdata, bkdat, RCPs, mc.cores = mc.cores)
-
 saveRDS(prediction_list, file = paste0("./output/predlist_",  gsub("-", "", Sys.Date()), ".rds"))
 
-# Prediction for sp1
-preds_sp1 <- rasterFromXYZ(cbind(predxyz[,1:2],prediction_list[[1]]))
-plot(preds_sp1[[1]],main=spp[1])
-points(spdat[spdat$species==spp[1],c(4,3)],pch=16,cex=.5)
 
-# Prediction for sp2
-preds_sp2 <- rasterFromXYZ(cbind(predxyz[,1:2],prediction_list[[2]]))
-plot(preds_sp2[[1]],main=spp[2])
-points(spdat[spdat$species==spp[2],c(4,3)],pch=16,cex=.5)
+## Prediction plots
 
-# Prediction for sp3
-preds_sp3 <- rasterFromXYZ(cbind(predxyz[,1:2],prediction_list[[3]]))
-plot(preds_sp3[[1]],main=spp[3])
-points(spdat[spdat$species==spp[3],c(4,3)],pch=16,cex=.5)
-
-# Ect ect ect
+for (i in 1:2){
+  
+  png(file = paste0("./output/plot_",tolower(gsub(" ","",spp[i])), ".png"),
+      width=1500, height=600, res = 130, pointsize = 12)
+  par(mfrow = c(1,2))
+  par(mar=c(3,3,5,7))
+  
+  preds_sp <- rasterFromXYZ(cbind(predxyz[,1:2],prediction_list[[i]]))
+  plot(preds_sp$rcp26, main = "rcp26", ext = extent(global_mask))
+  points(spdat[spdat$species == spp[i], c(4,3)], pch=16, cex=.3)
+  plot(preds_sp$rcp85, main = "rcp85", ext = extent(global_mask))
+  points(spdat[spdat$species == spp[i], c(4,3)], pch=16, cex=.3)
+  mtext(spp[i], side = 3, line = -2, outer = TRUE, cex = 1.5, font = 2)
+  rm(preds_sp)
+  dev.off()
+}

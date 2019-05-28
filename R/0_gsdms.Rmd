@@ -1,12 +1,12 @@
 ---
-title: "0_gsdms"
+title: "GBIF data cleaning"
+description: "Master script file for global SDMs for the ARC Trade-Biodiversity project"
 author: "Payal Bal"
 collaborators: "Casey Visintin (UoM), Skip Woolley (CSIRO), Chris Ware (CSIRO)"
 date: "`r Sys.Date()`"
 output: html_document
-Reference R script files: 
+R script files: "0_gsdms.Rmd"
 gbif data citation: "GBIF.org (12th December 2017) GBIF Occurrence Download https://doi.org/10.15468/dl.kaciwi"
-description: "Master script file for global SDMs for the ARC Trade-Biodiversity project"
 ---
 
 <!-- Specify global options for code chunks -->
@@ -15,186 +15,221 @@ description: "Master script file for global SDMs for the ARC Trade-Biodiversity 
 ```
 
 
-
 ## Load packages
 ```{r load packages, eval=TRUE, echo=TRUE}
 library(pacman)
-p_load(DBI, RPostgreSQL, data.table, rgbif, foreach, tidyverse, foreach, iterators, parallel, doParallel, doMC) 
-  # tidyverse includes dplyr so no need to load that separately
+p_load(DBI, RPostgreSQL, data.table, rgbif, foreach, tidyverse, 
+       iterators, parallel, doParallel, doMC)
 ```
-
 
 
 ## Connect to server
 <span style="color:blue">Issue: Prompt for server details here</span>
 ```{r connect to server, eval=FALSE, echo=TRUE}
-drv <- dbDriver("PostgreSQL")  #Specify a driver for postgreSQL type database
+drv <- dbDriver("PostgreSQL")
 con <- dbConnect(drv, dbname="", user="", password="", host="", port="")
 ```
+```{r connect to server2, eval=TRUE, echo=FALSE}
+drv <- dbDriver("PostgreSQL") ## specify driver for postgreSQL database
+con <- dbConnect(drv, dbname="qaeco_spatial", user="qaeco", password="Qpostgres15", host="boab.qaeco.com", port="5432")
+```
 
 
-
-## GBIF record counts
-*Number of records in the online gbif database as of* `r Sys.Date()`
-```{r count gbif all, eval=TRUE, echo=FALSE}
+## Count occurrence record in GBIF database
+Number of records in the online gbif database as of `r Sys.Date()`*:*
+```{r count gbif online, eval=TRUE, echo=FALSE}
 occ_count()
 ```
-Ref: https://www.gbif.org/occurrence/search
+See here: https://www.gbif.org/occurrence/search
  
-*Number of records in the downloaded gbif csv file downloaded on 2017-12-12*<br/>
-  - i.e. number of rows in downloaded csv file named gbif.raw_data on server<br/>
-  - Count obtained from db metadata 
-```{r count gbif.raw_data, eval=TRUE, echo=FALSE}
-raw.n <- as.numeric(dbGetQuery(con,"SELECT reltuples::bigint AS estimate
+Number of records in the raw gbif database downloaded (as.csv and upload on server) on 2017-12-12:<br/>
+  - equal to number of rows in gbif.raw_data on server<br/>
+  - count obtained from db metadata
+```{r count rows gbif.raw_data, eval=TRUE, echo=FALSE}
+as.numeric(dbGetQuery(con,"SELECT reltuples::bigint AS estimate
                 FROM   pg_class
                 WHERE  oid = 'gbif.raw_data'::regclass;
                 "))
-raw.n
 ```
 
-*Size of gbif database (see citation above)*
-```{r sizeraw, eval=TRUE, echo=TRUE}
+Size of raw gbif database (see citation above)
+```{r size gbif.raw_data, eval=TRUE, echo=FALSE}
 dbGetQuery(con,"
               SELECT pg_size_pretty(pg_relation_size('gbif.raw_data'));
               ")
 ```
 
 
-## Run first filter on downloaded gbif csv data and create new table
-  - raw data: gbif.raw_data
-  - new table: gbif.firstfilter
-  - filter includes: (1) Kingdom = Animalia; (2) Geographical coordinates = NOT NULL; and (3) Time frame = 1950 - 2017
+## Data cleaning
+#### Run first filter
+  - raw database: gbif.raw_data
+  - new database: gbif.filtered
 
-```{r ffilter, eval=FALSE, echo=TRUE}
+```{r first filter, eval=FALSE, echo=TRUE}
 ## Run query for first filter and create new table
 dbSendQuery(con,"
-           CREATE TABLE gbif.firstfilter AS
-           SELECT *
-           FROM gbif.raw_data
-           WHERE kingdom = 'Animalia'
-           AND decimallatitude IS NOT NULL
-           AND decimallongitude IS NOT NULL
-           AND year BETWEEN '1950' AND '2017';
-           
-           ALTER TABLE gbif.firstfilter 
-           DROP COLUMN catalognumber,
-           DROP COLUMN collectioncode,
-           DROP COLUMN identifiedby,
-           DROP COLUMN institutioncode,
-           DROP COLUMN mediatype,
-           DROP COLUMN publishingorgkey,
-           DROP COLUMN recordedby,
-           DROP COLUMN rightsholder,
-           DROP COLUMN typestatus;
-           
-           ALTER TABLE gbif.firstfilter ADD PRIMARY KEY (gbifid);
-           
-           ALTER TABLE gbif.firstfilter 
-           ALTER COLUMN gbifid TYPE INTEGER USING gbifid::integer;
-           
-           CREATE INDEX firstfilter_index
-           ON gbif.firstfilter USING btree
-           (taxonkey COLLATE pg_catalog.default)
-           TABLESPACE pg_default;
-           ") 
+            CREATE TABLE gbif.filtered AS
+            SELECT
+              gbifid,
+              occurrenceid, 
+              species,
+              scientificname,
+              countrycode,
+              decimallatitude,
+              decimallongitude,
+              coordinateuncertaintyinmeters,
+              coordinateprecision,
+              elevation,
+              elevationaccuracy,
+              \"depth\",
+              depthaccuracy,
+              eventdate,
+              \"year\",
+              taxonkey,
+              phylum,
+              \"class\",
+              \"order\",
+              \"family\",
+              genus,
+              specieskey,
+              basisofrecord,
+              issue
+            FROM gbif.raw_data
+            WHERE kingdom = 'Animalia'
+            AND year BETWEEN '1950' AND '2018'
+            AND basisofrecord IN ('HUMAN_OBSERVATION','PRESERVED_SPECIMEN', 'OBSERVATION', 'MATERIAL_SAMPLE', 'MACHINE_OBSERVATION');
+
+            ALTER TABLE gbif.filtered
+            RENAME COLUMN \"depth\" TO recdepth;
+            ALTER TABLE gbif.filtered
+            RENAME COLUMN \"year\" TO recyear;
+            ALTER TABLE gbif.filtered
+            RENAME COLUMN \"class\" TO taxclass;
+            ALTER TABLE gbif.filtered
+            RENAME COLUMN \"order\" TO taxorder;
+            ALTER TABLE gbif.filtered
+            RENAME COLUMN \"family\" TO taxfamily;
+            ") 
 ```
 
-*Number of records in new table after running first filter* <br/>
-  - i.e. number of rows in gbif.first_filter<br/>
-  - Count obtained from db metadata
-```{r count gbif.firstfilter, eval=TRUE, echo=FALSE}
-firstfilter.n <- as.numeric(dbGetQuery(con,"
+Number of records in new database <br/>
+  - equal to number of rows in gbif.first_filter<br/>
+  - count obtained from db metadata
+```{r count gbif.filtered, eval=TRUE, echo=FALSE}
+dbGetQuery(con,"
                 SELECT reltuples::bigint AS estimate
                 FROM   pg_class
-                WHERE  oid = 'gbif.firstfilter'::regclass;
-                "))
-firstfilter.n
-```
-
-
-## Change data type within table
-#### Convert empty characters in new table to NULL
-<span style="color:blue">Issue: Prompt for server details here</span>
-
-```{r nullval, eval=FALSE, echo=TRUE}
-## Obtain field names for gbif.firstfilter
-gbif.fields <- read.csv(paste(getwd(), "/R/gbif_header.csv", sep=""),sep="\t")
-gbif.fields <- colnames(gbif.fields)
-drop.fields <- c("catalognumber", "collectioncode", "identifiedby", "institutioncode", "mediatype", "publishingorgkey", "recordedby", "rightsholder", "typestatus", "order")
-# "order" is a reserved word in PostgreSQL because it is an operator (e.g. ORDER BY x). Unfortunately, GBIF also uses this as a field name. So it doesn't work in the foreach loop. Instead, it needs to be run as separate query. 
-in.fields <- gbif.fields[which(!gbif.fields %in% drop.fields)]
-
-## Specify empty characters in all columns within gbif.firstfilter (except order) as NULL
-p_load(foreach, iterators, parallel, doParallel, doMC)
-
-registerDoMC(detectCores() - 1) #set up cores for parallel processing (72-1)
-
-foreach (i=in.fields) %dopar% { 
-  drv <- dbDriver("PostgreSQL")  #Specify a driver for postgreSQL type database
-  con <- dbConnect(drv, dbname="", user="", password="", host="", port="")
-  dbSendQuery(con, paste("UPDATE gbif.firstfilter SET ",i," = NULL WHERE ",i,"::char = '';", sep=""))
-}
-
-# Set empty characters in the gbif field 'order' to NULL
-dbSendQuery(con, "UPDATE gbif.firstfilter SET \"order\" = NULL WHERE \"order\"::char = '';")
-```
-
-
-#### Convert lat-long to numeric
-```{r latlong numeric, eval=FALSE, echo=TRUE}
-dbSendQuery(con,"
-                ALTER TABLE gbif.firstfilter 
-                ALTER COLUMN decimallatitude TYPE NUMERIC USING decimallatitude::numeric
-                ")
-
-dbSendQuery(con,"
-                ALTER TABLE gbif.firstfilter 
-                ALTER COLUMN decimallongitude TYPE NUMERIC USING decimallongitude::numeric
+                WHERE  oid = 'gbif.filtered'::regclass;
                 ")
 ```
 
-## Run checks on new table
-*Size of new table*
-```{r sizeff, eval=TRUE, echo=FALSE}
+Size of new gbif database
+```{r size gbif.filtered, eval=TRUE, echo=FALSE}
 dbGetQuery(con,"
-              SELECT pg_size_pretty(pg_relation_size('gbif.firstfilter'));
+              SELECT pg_size_pretty(pg_relation_size('gbif.filtered'));
               ")
 ```
 
-*Number of columns*
-```{r colcount, eval=TRUE, echo=FALSE}
+
+#### Convert empty characters in gbif.filtered to NULL
+<span style="color:blue">Issue: Prompt for server details here</span>
+
+```{r empty to null, eval=FALSE, echo=TRUE}
 dbGetQuery(con,"
-            SELECT COUNT(*) from information_schema.columns
-            where table_name='firstfilter';
+               SELECT column_name 
+               FROM information_schema.columns 
+               WHERE table_schema = 'gbif'
+               AND table_name = 'filtered';
+               ")$column_name
+
+## Set empty characters in columns within gbif.filtered as NULL
+registerDoMC(30)
+foreach (i=gbif.fields) %dopar% { 
+  drv <- dbDriver("PostgreSQL")
+  con <- dbConnect(drv, dbname="", user="", 
+                   password="", host="", port="")
+  dbSendQuery(con, paste("UPDATE gbif.filtered SET ",i," = NULL WHERE ",i,
+                         "::char = '';", sep=""))
+}
+```
+
+
+#### Discard records with NULL values for 'species' or 'scientificname'
+```{r discard null species, eval=FALSE, echo=TRUE}
+dbSendQuery(con,"
+            DELETE FROM gbif.filtered
+            WHERE species IS NULL
+            OR scientificname IS NULL;
             ")
 ```
 
-*Check for NULL values in table...??*
-...
+#### Discard records with NULL lat long values
+```{r discard null lat-long, eval=FALSE, echo=TRUE}
+dbSendQuery(con,"
+            DELETE FROM gbif.filtered
+            WHERE decimallatitude IS NULL
+            OR decimallongitude IS NULL;
+            ")
+```
 
+#### Convert lat and long to numeric
+```{r numeric lat-long, eval=FALSE, echo=TRUE}
+dbSendQuery(con,"
+            ALTER TABLE gbif.filtered 
+            ALTER COLUMN decimallatitude TYPE NUMERIC USING decimallatitude::numeric;
+            ")
 
+dbSendQuery(con,"
+            ALTER TABLE gbif.filtered
+            ALTER COLUMN decimallongitude TYPE NUMERIC USING decimallongitude::numeric;
+            ")
+```
 
-
-
-## Run second filter
-  - on gbif.first_filter to create gbif.second_filter
-  - includes the following steps:
-    1. Issues
-    2. Accuracy
-    3. Basis of Record
-    
-    
-```{r filter2 step1}
-
+#### Set primary key and index
+```{r key and index, eval=FALSE, echo=TRUE}
+dbSendQuery(con,"
+            ALTER TABLE gbif.filtered ADD PRIMARY KEY (gbifid);
+             
+            ALTER TABLE gbif.filtered 
+            ALTER COLUMN gbifid TYPE INTEGER USING gbifid::integer;
+            
+            CREATE INDEX filtered_index
+            ON gbif.filtered USING btree
+            (taxonkey COLLATE pg_catalog.default)
+            TABLESPACE pg_default;
+            ")
 ```
 
 
-```{r filter2 step2}
 
+## Run checks on new database
+Check size of gbif.filtered
+```{r size gbif.filtered2, eval=TRUE, echo=FALSE}
+dbGetQuery(con,"
+              SELECT pg_size_pretty(pg_relation_size('gbif.filtered'));
+              ")
+```
+
+Check number of columns
+```{r columns gbif.filtered, eval=TRUE, echo=FALSE}
+dbGetQuery(con,"
+              SELECT COUNT(*) 
+              FROM information_schema.columns
+              WHERE table_name='filtered';
+              ")
+```
+
+Check number of rows
+```{r rows gbif.filtered, eval=TRUE, echo=FALSE}
+dbGetQuery(con,"
+              SELECT reltuples::bigint AS estimate
+              FROM pg_class
+              WHERE  oid = 'gbif.filtered'::regclass;
+              ")
 ```
 
 
-## References and useful links
+## Useful links
 *gbif data fields* <br/>
 https://www.gbif.org/developer/occurrence <br/>
 http://rs.gbif.org/core/dwc_occurrence.xml
