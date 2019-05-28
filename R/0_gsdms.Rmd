@@ -2,7 +2,7 @@
 title: "GBIF data cleaning"
 description: "Master script file for global SDMs for the ARC Trade-Biodiversity project"
 author: "Payal Bal"
-collaborators: "Casey Visintin (UoM), Skip Woolley (CSIRO), Chris Ware (CSIRO)"
+collaborators: "Casey Visintin (UoM)"
 date: "`r Sys.Date()`"
 output: html_document
 R script files: "0_gsdms.Rmd"
@@ -14,9 +14,7 @@ gbif data citation: "GBIF.org (12th December 2017) GBIF Occurrence Download http
 # knitr::opts_chunk$set(echo = FALSE)
 ```
 
-
-## Load packages
-```{r load packages, eval=TRUE, echo=TRUE}
+```{r load packages, eval=TRUE, echo=FALSE}
 library(pacman)
 p_load(DBI, RPostgreSQL, data.table, rgbif, foreach, tidyverse, 
        iterators, parallel, doParallel, doMC)
@@ -24,7 +22,8 @@ p_load(DBI, RPostgreSQL, data.table, rgbif, foreach, tidyverse,
 
 
 ## Connect to server
-<span style="color:blue">Issue: Prompt for server details here</span>
+<!-- <span style="color:blue">Issue: Prompt for server details here</span> -->
+
 ```{r connect to server, eval=FALSE, echo=TRUE}
 drv <- dbDriver("PostgreSQL")
 con <- dbConnect(drv, dbname="", user="", password="", host="", port="")
@@ -132,7 +131,7 @@ dbGetQuery(con,"
 
 
 #### Convert empty characters in gbif.filtered to NULL
-<span style="color:blue">Issue: Prompt for server details here</span>
+<!-- <span style="color:blue">Issue: Prompt for server details here</span> -->
 
 ```{r empty to null, eval=FALSE, echo=TRUE}
 dbGetQuery(con,"
@@ -234,5 +233,5 @@ dbGetQuery(con,"
 https://www.gbif.org/developer/occurrence <br/>
 http://rs.gbif.org/core/dwc_occurrence.xml
 
-*knitr* <br/>
-http://kbroman.org/knitr_knutshell/pages/Rmarkdown.html
+<!-- *knitr* <br/> -->
+<!-- http://kbroman.org/knitr_knutshell/pages/Rmarkdown.html -->

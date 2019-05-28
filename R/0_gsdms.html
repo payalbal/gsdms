@@ -130,15 +130,9 @@ $(document).ready(function () {
 
 
 <!-- Specify global options for code chunks -->
-<div id="load-packages" class="section level2">
-<h2>Load packages</h2>
-<pre class="r"><code>library(pacman)
-p_load(DBI, RPostgreSQL, data.table, rgbif, foreach, tidyverse, 
-       iterators, parallel, doParallel, doMC)</code></pre>
-</div>
 <div id="connect-to-server" class="section level2">
 <h2>Connect to server</h2>
-<p><span style="color:blue">Issue: Prompt for server details here</span></p>
+<!-- <span style="color:blue">Issue: Prompt for server details here</span> -->
 <pre class="r"><code>drv &lt;- dbDriver(&quot;PostgreSQL&quot;)
 con &lt;- dbConnect(drv, dbname=&quot;&quot;, user=&quot;&quot;, password=&quot;&quot;, host=&quot;&quot;, port=&quot;&quot;)</code></pre>
 </div>
@@ -214,7 +208,7 @@ dbSendQuery(con,&quot;
 </div>
 <div id="convert-empty-characters-in-gbif.filtered-to-null" class="section level4">
 <h4>Convert empty characters in gbif.filtered to NULL</h4>
-<p><span style="color:blue">Issue: Prompt for server details here</span></p>
+<!-- <span style="color:blue">Issue: Prompt for server details here</span> -->
 <pre class="r"><code>dbGetQuery(con,&quot;
                SELECT column_name 
                FROM information_schema.columns 
@@ -290,7 +284,8 @@ dbSendQuery(con,&quot;
 <div id="useful-links" class="section level2">
 <h2>Useful links</h2>
 <p><em>gbif data fields</em> <br /> <a href="https://www.gbif.org/developer/occurrence" class="uri">https://www.gbif.org/developer/occurrence</a> <br /> <a href="http://rs.gbif.org/core/dwc_occurrence.xml" class="uri">http://rs.gbif.org/core/dwc_occurrence.xml</a></p>
-<p><em>knitr</em> <br /> <a href="http://kbroman.org/knitr_knutshell/pages/Rmarkdown.html" class="uri">http://kbroman.org/knitr_knutshell/pages/Rmarkdown.html</a></p>
+<!-- *knitr* <br/> -->
+<!-- http://kbroman.org/knitr_knutshell/pages/Rmarkdown.html -->
 </div>
 
 
