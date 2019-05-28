@@ -136,13 +136,14 @@ $(document).ready(function () {
 <pre class="r"><code>drv &lt;- dbDriver(&quot;PostgreSQL&quot;)
 con &lt;- dbConnect(drv, dbname=&quot;&quot;, user=&quot;&quot;, password=&quot;&quot;, host=&quot;&quot;, port=&quot;&quot;)</code></pre>
 </div>
-<div id="count-occurrence-record-in-gbif-database" class="section level2">
-<h2>Count occurrence record in GBIF database</h2>
+<div id="count-occurrence-records-in-gbif-database" class="section level2">
+<h2>Count occurrence records in GBIF database</h2>
 <p>Number of records in the online gbif database as of 2019-05-28<em>:</em></p>
 <pre><code>## [1] 1300862451</code></pre>
 <p>See here: <a href="https://www.gbif.org/occurrence/search" class="uri">https://www.gbif.org/occurrence/search</a></p>
 <p>Number of records in the raw gbif database downloaded (as.csv and upload on server) on 2017-12-12:<br /> - equal to number of rows in gbif.raw_data on server<br /> - count obtained from db metadata</p>
-<pre><code>## [1] 874502784</code></pre>
+<pre><code>##    estimate
+## 1 874502784</code></pre>
 <p>Size of raw gbif database (see citation above)</p>
 <pre><code>##   pg_size_pretty
 ## 1         409 GB</code></pre>

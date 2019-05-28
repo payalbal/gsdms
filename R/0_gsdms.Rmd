@@ -2,7 +2,7 @@
 title: "GBIF data cleaning"
 description: "Master script file for global SDMs for the ARC Trade-Biodiversity project"
 author: "Payal Bal"
-collaborators: "Casey Visintin (UoM)"
+collaborators: "Casey Visintin"
 date: "`r Sys.Date()`"
 output: html_document
 R script files: "0_gsdms.Rmd"
@@ -16,7 +16,7 @@ gbif data citation: "GBIF.org (12th December 2017) GBIF Occurrence Download http
 
 ```{r load packages, eval=TRUE, echo=FALSE}
 library(pacman)
-p_load(DBI, RPostgreSQL, data.table, rgbif, foreach, tidyverse, 
+p_load(DBI, RPostgreSQL, data.table, rgbif, foreach, 
        iterators, parallel, doParallel, doMC)
 ```
 
@@ -34,7 +34,7 @@ con <- dbConnect(drv, dbname="qaeco_spatial", user="qaeco", password="Qpostgres1
 ```
 
 
-## Count occurrence record in GBIF database
+## Count occurrence records in GBIF database
 Number of records in the online gbif database as of `r Sys.Date()`*:*
 ```{r count gbif online, eval=TRUE, echo=FALSE}
 occ_count()
@@ -45,12 +45,12 @@ Number of records in the raw gbif database downloaded (as.csv and upload on serv
   - equal to number of rows in gbif.raw_data on server<br/>
   - count obtained from db metadata
 ```{r count rows gbif.raw_data, eval=TRUE, echo=FALSE}
-as.numeric(dbGetQuery(con,"SELECT reltuples::bigint AS estimate
+dbGetQuery(con,"SELECT reltuples::bigint AS estimate
                 FROM   pg_class
                 WHERE  oid = 'gbif.raw_data'::regclass;
-                "))
+                ")
 ```
-
+  
 Size of raw gbif database (see citation above)
 ```{r size gbif.raw_data, eval=TRUE, echo=FALSE}
 dbGetQuery(con,"
