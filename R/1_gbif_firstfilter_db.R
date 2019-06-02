@@ -1,6 +1,5 @@
 ## GBIF DATA PROCESSING - PART 1
-
-## GBIF data download reference: GBIF.org (12th December 2017) GBIF Occurrence Download https://doi.org/10.15468/dl.kaciwi
+## Data citation: GBIF.org (12th December 2017) GBIF Occurrence Download https://doi.org/10.15468/dl.kaciwi
 
 ## ------------------------------------------------------
 ## Set up working environment
@@ -8,7 +7,7 @@
 
 ## Load libraries
 library(pacman)
-p_load(DBI, RPostgreSQL, data.table, rgbif, foreach, tidyverse, 
+p_load(DBI, RPostgreSQL, data.table, rgbif, foreach,
        iterators, parallel, doParallel, doMC) 
 
 ## Connect to server (named 'con' later in the code)
@@ -77,13 +76,13 @@ dbSendQuery(con,"
             ") 
 
 
-## Convert empty characters in gbif.filtered to NULL
-gbif.fields <- dbGetQuery(con,"
-                           SELECT column_name 
-                           FROM information_schema.columns 
-                           WHERE table_schema = 'gbif'
-                           AND table_name = 'filtered';
-                           ")$column_name
+## Get column names of new table
+dbGetQuery(con,"
+           SELECT column_name 
+           FROM information_schema.columns 
+           WHERE table_schema = 'gbif'
+           AND table_name = 'filtered';
+           ")$column_name
 
 ## Set empty characters in columns within gbif.filtered as NULL
 # registerDoMC(detectCores() - 1) # (72-1) -  uses up too much
@@ -143,9 +142,9 @@ dbSendQuery(con,"
 
 
 
-  # ------------------------------------------------------
+  ## ------------------------------------------------------
   ## Checks
-  # ------------------------------------------------------
+  ## ------------------------------------------------------
   ## Check number of columns
   length(gbif.fields) == dbGetQuery(con,"
               SELECT COUNT(*) 
@@ -166,7 +165,7 @@ dbSendQuery(con,"
               FROM gbif.temp
               WHERE decimallatitude IS NOT NULL
               OR decimallongitude IS NOT NULL;
-              "))
+              ")
   
   ## Check for NULL values in lat-long
   dbGetQuery(con,"

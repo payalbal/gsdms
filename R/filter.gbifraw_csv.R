@@ -1,5 +1,5 @@
 
-##'@title filter raw gbif csv data
+##'@title 
 ##'
 ##'@description Filters csv data downloaded from GBIF.
 ##'

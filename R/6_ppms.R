@@ -17,10 +17,14 @@ if(!dir.exists("./output")) {
 }
 
 
-## Load data
+## Load covariate data
 covariates <- readRDS("./data/covariates.rds")
 covariates_predict <- readRDS("./data/covariates_predict.rds")
 raw_mask <- raster("./data/bio1.bil") 
+
+## Load species data
+add function...
+
 gbif <- read.csv("./data/2019-05-14_gbif_iucnsp.csv", header = TRUE)
 
 

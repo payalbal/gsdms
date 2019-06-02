@@ -11,7 +11,7 @@
 
 <meta name="author" content="Payal Bal" />
 
-<meta name="date" content="2019-05-28" />
+<meta name="date" content="2019-05-29" />
 
 <title>GBIF data cleaning</title>
 
@@ -124,7 +124,7 @@ $(document).ready(function () {
 
 <h1 class="title toc-ignore">GBIF data cleaning</h1>
 <h4 class="author"><em>Payal Bal</em></h4>
-<h4 class="date"><em>2019-05-28</em></h4>
+<h4 class="date"><em>2019-05-29</em></h4>
 
 </div>
 
@@ -138,8 +138,8 @@ con &lt;- dbConnect(drv, dbname=&quot;&quot;, user=&quot;&quot;, password=&quot;
 </div>
 <div id="count-occurrence-records-in-gbif-database" class="section level2">
 <h2>Count occurrence records in GBIF database</h2>
-<p>Number of records in the online gbif database as of 2019-05-28<em>:</em></p>
-<pre><code>## [1] 1300862451</code></pre>
+<p>Number of records in the online gbif database as of 2019-05-29<em>:</em></p>
+<pre><code>## [1] 1300921507</code></pre>
 <p>See here: <a href="https://www.gbif.org/occurrence/search" class="uri">https://www.gbif.org/occurrence/search</a></p>
 <p>Number of records in the raw gbif database downloaded (as.csv and upload on server) on 2017-12-12:<br /> - equal to number of rows in gbif.raw_data on server<br /> - count obtained from db metadata</p>
 <pre><code>##    estimate
@@ -207,6 +207,21 @@ dbSendQuery(con,&quot;
 <pre><code>##   pg_size_pretty
 ## 1         147 GB</code></pre>
 </div>
+<div id="get-column-names-for-new-database" class="section level4">
+<h4>Get column names for new database</h4>
+<pre><code>##  [1] &quot;gbifid&quot;                        &quot;occurrenceid&quot;                 
+##  [3] &quot;species&quot;                       &quot;scientificname&quot;               
+##  [5] &quot;countrycode&quot;                   &quot;decimallatitude&quot;              
+##  [7] &quot;decimallongitude&quot;              &quot;coordinateuncertaintyinmeters&quot;
+##  [9] &quot;coordinateprecision&quot;           &quot;elevation&quot;                    
+## [11] &quot;elevationaccuracy&quot;             &quot;recdepth&quot;                     
+## [13] &quot;depthaccuracy&quot;                 &quot;eventdate&quot;                    
+## [15] &quot;recyear&quot;                       &quot;taxonkey&quot;                     
+## [17] &quot;phylum&quot;                        &quot;taxclass&quot;                     
+## [19] &quot;taxorder&quot;                      &quot;taxfamily&quot;                    
+## [21] &quot;genus&quot;                         &quot;specieskey&quot;                   
+## [23] &quot;basisofrecord&quot;                 &quot;issue&quot;</code></pre>
+</div>
 <div id="convert-empty-characters-in-gbif.filtered-to-null" class="section level4">
 <h4>Convert empty characters in gbif.filtered to NULL</h4>
 <!-- <span style="color:blue">Issue: Prompt for server details here</span> -->
@@ -217,7 +232,6 @@ dbSendQuery(con,&quot;
                AND table_name = 'filtered';
                &quot;)$column_name
 
-## Set empty characters in columns within gbif.filtered as NULL
 registerDoMC(30)
 foreach (i=gbif.fields) %dopar% { 
   drv &lt;- dbDriver(&quot;PostgreSQL&quot;)

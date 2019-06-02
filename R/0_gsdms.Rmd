@@ -5,7 +5,7 @@ author: "Payal Bal"
 collaborators: "Casey Visintin"
 date: "`r Sys.Date()`"
 output: html_document
-R script files: "0_gsdms.Rmd"
+Acompanying R script files: "1_gbif_db_processing.R"
 gbif data citation: "GBIF.org (12th December 2017) GBIF Occurrence Download https://doi.org/10.15468/dl.kaciwi"
 ---
 
@@ -129,6 +129,15 @@ dbGetQuery(con,"
               ")
 ```
 
+#### Get column names for new database
+```{r column names, eval=TRUE, echo=FALSE}
+dbGetQuery(con,"
+           SELECT column_name 
+           FROM information_schema.columns 
+           WHERE table_schema = 'gbif'
+           AND table_name = 'filtered';
+           ")$column_name
+```
 
 #### Convert empty characters in gbif.filtered to NULL
 <!-- <span style="color:blue">Issue: Prompt for server details here</span> -->
@@ -141,7 +150,6 @@ dbGetQuery(con,"
                AND table_name = 'filtered';
                ")$column_name
 
-## Set empty characters in columns within gbif.filtered as NULL
 registerDoMC(30)
 foreach (i=gbif.fields) %dopar% { 
   drv <- dbDriver("PostgreSQL")
