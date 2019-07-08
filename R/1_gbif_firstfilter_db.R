@@ -127,7 +127,7 @@ dbSendQuery(con,"
             ALTER COLUMN decimallongitude TYPE NUMERIC USING decimallongitude::numeric;
             ")
 
-## Set primary key and index
+## Set primary key and index on taxonkey
 dbSendQuery(con,"
             ALTER TABLE gbif.filtered ADD PRIMARY KEY (gbifid);
              
@@ -140,7 +140,11 @@ dbSendQuery(con,"
             TABLESPACE pg_default;
             ")
 
-
+## Create index on species
+dbSendQuery(con,"
+            CREATE INDEX filtered_species_index
+            ON gbif.filtered USING btree (species ASC NULLS LAST);
+            ")
 
   ## ------------------------------------------------------
   ## Checks

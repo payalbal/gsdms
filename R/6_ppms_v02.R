@@ -4,13 +4,12 @@
 #'
 #'@description Fit PPMs using GBIF data for IUCN listed species
 #'GitHub: https://github.com/payalbal/gsdms/blob/master/R/6_ppms.R
+#'
+#'
+#'
 
-
-
-## SET UP WORKSPACE
 pacman::p_load(sp, raster, spatstat.data, nlme, rpart, spatstat, ppmlasso, 
        parallel, doParallel, doMC)
-
 
 ## Create 'output' folder
 if(!dir.exists("./output")) {
@@ -18,8 +17,6 @@ if(!dir.exists("./output")) {
 }
 
 
-
-## DATA
 ## Load covariate data
 covariates <- readRDS("./output/covariates.rds")
 covariates_predict <- readRDS("./output/covariates_predict.rds")
@@ -28,12 +25,15 @@ raw_mask <- raster("./data/bio1.bil")
 ## Load species data
 gbif <- read.csv("./data/2019-05-14_gbif_iucnsp.csv", header = TRUE)
 
+
 ## Update mask based on NAs in covariate data
 raw_mask[which(!is.na(raw_mask[]))] <- 1
 source("./R/align.maskNA.R")
 global_mask <- align.maskNA(covariates, raw_mask)
 covariates <- mask(covariates, global_mask)
 covariates_predict <- mask(covariates_predict, global_mask)
+  # covariates_predict_rcp26 <- covariates_predict[[names(covariates_predict)[grep('26', names(covariates_predict), invert = TRUE)]]]
+  # covariates_predict_rcp85 <- covariates_predict[[names(covariates_predict)[grep('26', names(covariates_predict), invert = TRUE)]]]
 
 ## Quadrature (background) points & associated covariate data
 global_mask0 <- global_mask
@@ -45,31 +45,34 @@ backxyz <- na.omit(cbind(backxyz, as.matrix(covariates)))
 backxyz200k <- backxyz[sample(nrow(backxyz), 200000), ]
 backxyz200k$Pres <- rep(0, dim(backxyz200k)[1])
 
-  # ## Checks
-  # summary(covariates)
-  # summary(backxyz200k)
-  # plot(global_mask0, legend = FALSE)
-  # plot(rasterFromXYZ(backxyz200k[,1:3]), col = "black", add = TRUE, legend=FALSE)
+  ## Checks
+  summary(covariates)
+  summary(backxyz200k)
+  plot(global_mask0, legend = FALSE)
+  plot(rasterFromXYZ(backxyz200k[,1:3]), col = "black", add = TRUE, legend=FALSE)
   
+
 ## Prediction points 
 predxyz <- data.frame(rpts@data, X=coordinates(rpts)[,1], Y=coordinates(rpts)[,2])     
 predxyz <- predxyz[,-1]
 predxyz <- na.omit(cbind(predxyz, as.matrix(covariates_predict)))
 
 
-
-## MODEL PARAMETERS
 ## Define global ppm variables
+  # the pred error you where getting was because there was different names between the fitted data and the predict data you had:
+  ## "ppmxyz$X" not "X" so the model was just returning the fitted values from the ppmlasso model.
 ppm_terms <- names(backxyz200k)[1:(length(names(backxyz200k))-1)]
 
 ## Specify covariates with interactions
 interaction_terms <- c("X", "Y")
 
+
 ## Fix n.fits = 20 and max.lambda = 100
 lambdaseq <- round(sort(exp(seq(-10, log(100 + 1e-05), length.out = 20)), 
                         decreasing = TRUE),5)
 
-## Estimate weights for background points
+
+## Estimate weights 
   ## calculate the area of the globe and then work out the weights based on the total area divided by number of points
 ar <- raster::area(global_mask0)
 ar <- mask(ar,global_mask)
@@ -77,7 +80,7 @@ totarea <- cellStats(ar,'sum')*1000 ## in meters^2
 area_offset <- extract(ar, backxyz200k[,c('X','Y')], small = TRUE, fun = mean, na.rm = TRUE)*1000 ## in meters
 bkgrd_wts <- c(totarea/area_offset)
 
-  ## Estimate species weights - but it's not quite right
+  ## this was meant to calculate the species weights - but it's not quite right
   # spdat <- gbif
   # species_names <- levels(factor(spdat$species))
   # spwts <- list()
@@ -93,10 +96,37 @@ bkgrd_wts <- c(totarea/area_offset)
   #       spwts[[i]] <- tmp_wts
   # }
 
+    ## TESTING FOR CORRELATED VARIABLES
+    ## There is no hard and fast rule about how many covariates to fit to data, and it will change depending on the data and the amount of information in each observation and how they vary with the covariates, how the covariates are correlated ect... But to start I'd only fit sqrt(n_observations) covariates. So if you have 20 occurrences that's 4-5 covariates (including the polynomials) so that's only two variables! You might have to identify the most important variable and start from there.
+    
+    ## let's do a PCA on the data to work out which are the most variable coefs.
+    Xoriginal=t(as.matrix(backxyz200k))
+    
+    # Center the data so that the mean of each row is 0
+    rowmns <- rowMeans(Xoriginal)
+    X <-  Xoriginal - matrix(rep(rowmns, dim(Xoriginal)[2]), nrow=dim(Xoriginal)[1])
+    
+    # Calculate P
+    A <- X %*% t(X)
+    E <- eigen(A,TRUE)
+    P <- t(E$vectors)
+    
+    dimnames(P) <- list(colnames(backxyz200k),paste0("PCA",1:ncol(P)))
+    df <- as.data.frame(t(P[,1:5]))
+    df$row.names<-rownames(df)
+    library(reshape2)
+    library(ggplot2)
+    long.df<-reshape2::melt(df,id=c("row.names"))
+    pca_plot <- ggplot2::ggplot(long.df,aes(x=row.names,y=variable,fill=value))+
+      geom_raster()+
+      scale_fill_viridis_c()+
+      theme_minimal()
+    
+    ## not surprising that elevation, slope and aspect are all correlated (choose one).
+    pca_plot
 
 
-## SPECIFY MODEL
-## Function: PPM model        
+## Function: PPM model fitting        
 fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms, n.fits=50) {
    
   species_names <- levels(factor(spdat$species))
@@ -122,23 +152,22 @@ fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms,
     ppmxyz[ppmxyz$Pres == 0,]$wt <- bkwts
     ppmxyz[ppmxyz$Pres == 1,]$wt <- 1e-6 #spwts[[i]]
     
-    ## Specify PPM formula based on number of observations for a species
+    ## Specify ppm formula based on number of observations for a species
     nk <- ceiling(sqrt(nrow(spxy)))
     
-    ## if low number of observations, i.e. nrow(spxy) =< 25, only use the spatial covariates (linear, quadratic with interaction)
+    ## if low number of observations, nrow(spxy) =< 25, only use the spatial covariates (linear, quadratic with interaction)
     if(nk <= 5){ ## 5 because linear, quadratic with interaction for X ad Y gives 5 terms
       ppmform <- formula(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
                                              ", degree = 2, raw = FALSE)",collapse =""))
-      ## including land-use change even for species with low number of observations
+      ## including land-use change for species with low number of observations
       # paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
       #        ", degree = 2, raw = FALSE) + poly(landuse, degree = 2, raw = FALSE)",collapse ="")
       
     } else  {
       ## if number of observations > 25, fit additional covariates as independent with linear and quadratic terms
-      ## addition of covariates is based on the order of covariates in stack/grid, starting with landuse, 
-      ## see names(covariates) for order
+      ## addition of covariates is based on order of covariates in stack/grid, starting with landuse, see names(covariates) for order
       ## implies a priority of covariates ...NOT QUITE RIGHT PERHAPS?
-      extra_covar <- ceiling((nk - 5)/2)
+      extra_covar <- ceiling((nk - 5)/2) ## fit additional covariates based on 
       if(extra_covar > 10) extra_covar <- 10 ## if enough observations, fit all parameters
       ppmform <- formula(paste0(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
                                        ", degree = 2, raw = FALSE)"), 
@@ -163,7 +192,6 @@ fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms,
   
 }
 
-
 ## Fit models and save output
 spdat <- gbif
 bkdat <- backxyz200k
@@ -171,47 +199,34 @@ bkwts <- bkgrd_wts
 spp <- levels(factor(spdat$species))
 mc.cores <- 1
 seq_along(spp)
-ppm_models <- parallel::mclapply(1:length(spp), fit_ppms_apply, spdat, #spwts,
+model_list <- parallel::mclapply(1:length(spp), fit_ppms_apply, spdat, #spwts,
                            bkdat, bkwts, interaction_terms, ppm_terms,
                            n.fits=100, mc.cores = mc.cores)
 
-
-## Catch errors in models & save outputs
-error_list <- list()
-model_list <- list()
-n <- 1
-m <- 1
+## Catch errors in model_list
+error_mods <- list()
 errorfile <- paste0("./output/errorfile_", gsub("-", "", Sys.Date()), ".txt")
-
-for(i in 1:length(ppm_models)){
-  if(!class(ppm_models[[i]])[1] == "try-error") {
-    model_list[[n]] <- ppm_models[[i]]
-    n <- n+1
-  }else{
+for(i in 1:length(model_list)){
+  if(class(model_list[[i]]) == "try-error") {
+    n <- 1
     print(paste0("Model ",i, " for '", spp[i], "' has errors"))
     cat(paste(i, ",", spp[i], "\n"),
         file = errorfile, append = T)
-    error_list[[m]] <- ppm_models[[i]]
-    m <- m+1
+    error_mods[[n]] <- model_list[[i]]
+    n <- n+1
+    model_list[[i]] <- NULL ## remove model from list
   }
 }
 
 saveRDS(model_list, file = paste0("./output/modlist_",  gsub("-", "", Sys.Date()), ".rds"))
-saveRDS(error_list, file = paste0("./output/errlist_",  gsub("-", "", Sys.Date()), ".rds"))
-
-error_species <- read.csv(paste0("./output/errorfile_", gsub("-", "", Sys.Date()), ".txt"), 
-                          header = FALSE, sep = ",")
-colnames(error_species) <- c("index", "species")
-error_index <- error_species$index
 
 
-## PREDICTION
 ## Function: PPM predictions
 predict_ppms_apply <- function(i, models_list, newdata, bkdat, RCPs = c(26, 85)){
   
   cat('Predicting ', i,'^th model\n')
   
-  if(class(models_list)== "try-error") { ## redundant because error models are removed
+  if(class(models_list)== "try-error") {
     return(NULL)
   } else {
     
@@ -244,7 +259,6 @@ predict_ppms_apply <- function(i, models_list, newdata, bkdat, RCPs = c(26, 85))
   }
 }
 
-
 ## Predict and save output
 newdata <- predxyz
 bkdat <- backxyz200k
@@ -255,8 +269,7 @@ prediction_list <- parallel::mclapply(seq_along(model_list), predict_ppms_apply,
 saveRDS(prediction_list, file = paste0("./output/predlist_",  gsub("-", "", Sys.Date()), ".rds"))
 
 
-
-## PLOTTING
+## Prediction plots
 error_sp <- read.csv(paste0("./output/errorfile_", gsub("-", "", Sys.Date()), ".txt"), 
                      header = FALSE, sep = ",")
 colnames(error_sp) <- c("sp_idx", "sp_name")
@@ -284,37 +297,6 @@ for (i in 1:length(prediction_list)){
 
 
 ## EXTRAS
-
-## TESTING FOR CORRELATED VARIABLES
-## There is no hard and fast rule about how many covariates to fit to data, and it will change depending on the data and the amount of information in each observation and how they vary with the covariates, how the covariates are correlated ect... But to start I'd only fit sqrt(n_observations) covariates. So if you have 20 occurrences that's 4-5 covariates (including the polynomials) so that's only two variables! You might have to identify the most important variable and start from there.
-
-## let's do a PCA on the data to work out which are the most variable coefs.
-Xoriginal=t(as.matrix(backxyz200k))
-
-# Center the data so that the mean of each row is 0
-rowmns <- rowMeans(Xoriginal)
-X <-  Xoriginal - matrix(rep(rowmns, dim(Xoriginal)[2]), nrow=dim(Xoriginal)[1])
-
-# Calculate P
-A <- X %*% t(X)
-E <- eigen(A,TRUE)
-P <- t(E$vectors)
-
-dimnames(P) <- list(colnames(backxyz200k),paste0("PCA",1:ncol(P)))
-df <- as.data.frame(t(P[,1:5]))
-df$row.names<-rownames(df)
-library(reshape2)
-library(ggplot2)
-long.df<-reshape2::melt(df,id=c("row.names"))
-pca_plot <- ggplot2::ggplot(long.df,aes(x=row.names,y=variable,fill=value))+
-  geom_raster()+
-  scale_fill_viridis_c()+
-  theme_minimal()
-
-## not surprising that elevation, slope and aspect are all correlated (choose one).
-pca_plot
-
-
 ##ALTERNATIVE - Specify ppm formula based on number of observations for a species
 nk <- ceiling(sqrt(nrow(spxy)))
 ## Specify ppm formula - independent with quadratic terms

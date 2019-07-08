@@ -3,7 +3,7 @@
 
 library(pacman)
 p_load(DBI, RPostgreSQL, foreach, iterators, parallel, doParallel, doMC)
-source("R/connect_to_server.R")
+# source("R/connect_to_server.R")
 
 ## Get IUCN species list
 # data_path <- "/Volumes/discovery_data/data/"
@@ -17,7 +17,6 @@ iucn_species <- as.vector(read.table("./output/2019-04-03_filtered_iucn.txt")[[1
   # iucn_species <- c("Panthera pardus" , "Lophuromys melanonyx”, "Macaca arctoides”, “Macaca nigra")
 
 ## Extract GBIF data based on IUCN species list
-iucn_species <- iucn_species[1:4]
 dbSendQuery(con, paste0("CREATE TABLE gbif.iucn_species AS SELECT * FROM gbif.filtered WHERE species = '", 
                         iucn_species[1], "';", sep =""))
 registerDoMC(30)
@@ -61,14 +60,20 @@ write.csv(iucn_species_counts, "./output/iucn_species_counts.csv", row.names=FAL
 rm(temp, nospecies, species_counts)
 
 ## Checks
-## Number of species in list vs filtered iucn_species db
-paste0("# IUCN species in list = ", length(iucn_species))
-paste0("# species in gbif.iucn_species = ", 
+## Species counts
+paste0("# IUCN species in list: ", length(iucn_species))
+paste0("# species in gbif.iucn_species:  ", 
        dbGetQuery(con, "SELECT COUNT(DISTINCT species) 
                   FROM gbif.iucn_species;
                   "))
 
+iucn_species20 <- dbGetQuery(con, "
+                              SELECT species, COUNT(*) AS spcounts
+                              FROM gbif.iucn_species
+                              GROUP BY species HAVING COUNT(*) >= 20;
+                              ")
 
+paste0("# species in gbif.iucn_species >= 20 occurrences: ", length(iucn_species20))
 
 ## Name matching in GBIF...
 

@@ -160,17 +160,18 @@ landuse[landuse[]%in%c(1,2,3,4,5)] <- 300
 landuse[landuse[]%in%c(13)] <- 400
 landuse[landuse[]%in%c(0, 11,15,16,17)] <- 500
 landuse <- landuse/100 - 1 ## these steps ensure that substituted alues do not overlap wth existing values
+  # check
+  unique(values(landuse))
 
-
-## COMPARE COVARIATES FOR NAS AND REMOVE NAS
+## STACK, MASK & SAVE COVARIATES AS RDS
 covariates_all <- stack(setdiff(file_out, file_out[grep("srtm|landuse", file_out)]), 
                         elevation, slope, roughness, aspect, landuse) 
   ## load and stack covariates files, excluding files for srtm and landuse
   ##  which were updated and therefore these rasters are loaded from memory.
 
 
-## SAVE COVARIATES AS RDS
-rm(list=setdiff(ls(), c("data_gsdms_in", "covariates_all", "global_mask")))
+
+rm(list=setdiff(ls(), c("data_gsdms", "covariates_all", "global_mask")))
 crs(covariates_all) <- crs(global_mask)
 covariates_all <- mask(covariates_all, global_mask)
 names(covariates_all) <- sub("_treated","", names(covariates_all))
@@ -185,11 +186,10 @@ summary(covariates_all)
 
 
 ## SUBSET COVARIATES
-## Subset  bvariables 
+## Subset variables 
 covariates_all <- readRDS(paste0(data_gsdms, "/covariates_all.rds"))
-cov_keep <- names(covariates_all)[grep('bio1$|bio4$|bio12$|bio15$', names(covariates_all))]
-cov_keep <- c(cov_keep, c("bulkdens","pawc","soilcarb","totaln",
-                          "srtm","slope","roughness","aspect","landuse"))
+cov_keep <- c("bio1", "bio4","bio12", "bio15", "bulkdens","pawc","soilcarb","totaln",
+                          "srtm","slope","roughness","aspect","landuse")
 covariates <- covariates_all[[which(names(covariates_all) %in% cov_keep)]]
 
 ## Test correlation in covariate
@@ -199,20 +199,22 @@ corr2 <- cor(cov_values, use = 'complete.obs', method = 'pearson')
 rm(cov_values)
 
 ## Visulaisation
-library(corrplot)
-library(mnormt); library(psych)
-library(reshape); library(GGally)
+  # library(corrplot)
+  # library(mnormt); library(psych)
+  # library(reshape); library(GGally)
 corrplot::corrplot(corr1$`pearson correlation coefficient`, type = "upper")
 corrplot::corrplot(corr1$`pearson correlation coefficient`, type = "upper", method = "number")
 corrplot::corrplot(corr2, type = "upper", method = "number")
 psych::pairs.panels(corr1$`pearson correlation coefficient`, scale = TRUE)
-GGally::ggpairs(as.data.frame(corr1$`pearson correlation coefficient`)) # don't like this. Slow and affiliated to ggplot.
+# GGally::ggpairs(as.data.frame(corr1$`pearson correlation coefficient`)) # don't like this. Slow and affiliated to ggplot.
 
 
 ## Remove highly correlated covariates (> 0.8)
 '%!in%' <- function(x,y)!('%in%'(x,y))
 covariates <- covariates[[which(names(covariates) %!in% c("bio4", "totaln", "roughness"))]]  
-# saveRDS(covariates, file = "./output/covariates.rds")
+  ## Bring landuse up in the stack
+covariates <- subset(covariates, c(length(names(covariates)), 1:length(names(covariates))-1))
+saveRDS(covariates, file = "./output/covariates.rds")
 
 
 
@@ -220,11 +222,12 @@ covariates <- covariates[[which(names(covariates) %!in% c("bio4", "totaln", "rou
 rm(cov_keep)
 cov_keep <- names(covariates_all)[grep('26|85', names(covariates_all))]
 cov_keep <- cov_keep[grep('701$|704$|7012$|7015$', cov_keep)]
-cov_keep <- c(cov_keep, c("bulkdens","pawc","soilcarb","totaln",
-                          "srtm","slope","roughness","aspect","landuse"))
+cov_keep <- c(names(covariates), cov_keep)
 covariates_predict <- covariates_all[[which(names(covariates_all) %in% cov_keep)]]
-## Remove same variables as for covariates because prediction matrix and design matrix shoudl be the same for ppms
-covariates_predict <- covariates_predict[[which(names(covariates_predict) %!in% c("bc26bi704" ,"bc85bi704","totaln", "roughness"))]]  
+  ## Remove same variables as for covariates because prediction matrix and design matrix shoudl be the same for ppms
+covariates_predict <- covariates_predict[[which(names(covariates_predict) %!in% c("bc26bi704" ,"bc85bi704","totaln", "roughness"))]]
+  ## Bring landuse up in the stack
+covariates_predict <- subset(covariates_predict, c(length(names(covariates_predict)), 1:(length(names(covariates_predict))-1)))
 saveRDS(covariates_predict, file = "./output/covariates_predict.rds")
 
 
