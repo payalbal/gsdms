@@ -10,7 +10,7 @@
 ## SET UP WORKSPACE
 pacman::p_load(sp, raster, spatstat.data, nlme, rpart, spatstat, ppmlasso, 
        parallel, doParallel, doMC)
-
+mc.cores <- 30 ## for boab
 
 ## Create 'output' folder
 if(!dir.exists("./output")) {
@@ -97,10 +97,9 @@ bkgrd_wts <- c(totarea/area_offset)
 
 ## SPECIFY MODEL
 ## Function: PPM model        
-fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms, n.fits=50) {
+fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms, species_names, n.fits=50) {
    
-  species_names <- levels(factor(spdat$species))
-  cat('Fitting a ppm to', species_names[i],'\nThis is the', i,'^th model of',length(species_names),'\n')
+    cat('Fitting a ppm to', species_names[i],'\nThis is the', i,'^th model of',length(species_names),'\n')
   logfile <- paste0("./output/ppm_log_",gsub(" ","_",species_names[i]),"_",gsub("-", "", Sys.Date()), ".txt")
   writeLines(c(""), logfile)
   spxy <- spdat[spdat$species %in% species_names[i], c(4,3)]
@@ -163,25 +162,22 @@ fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms,
   
 }
 
-
-## Fit models and save output
+## Fit models
 spdat <- gbif
 bkdat <- backxyz200k
 bkwts <- bkgrd_wts
 spp <- levels(factor(spdat$species))
-mc.cores <- 1
 seq_along(spp)
 ppm_models <- parallel::mclapply(1:length(spp), fit_ppms_apply, spdat, #spwts,
-                           bkdat, bkwts, interaction_terms, ppm_terms,
-                           n.fits=100, mc.cores = mc.cores)
-
+                           bkdat, bkwts, interaction_terms, ppm_terms, 
+                           species_names = spp, n.fits=100, mc.cores = mc.cores)
 
 ## Catch errors in models & save outputs
 error_list <- list()
 model_list <- list()
 n <- 1
 m <- 1
-errorfile <- paste0("./output/errorfile_", gsub("-", "", Sys.Date()), ".txt")
+errorfile <- paste0("./output/errorfile_1_", gsub("-", "", Sys.Date()), ".txt")
 
 for(i in 1:length(ppm_models)){
   if(!class(ppm_models[[i]])[1] == "try-error") {
@@ -199,10 +195,6 @@ for(i in 1:length(ppm_models)){
 saveRDS(model_list, file = paste0("./output/modlist_",  gsub("-", "", Sys.Date()), ".rds"))
 saveRDS(error_list, file = paste0("./output/errlist_",  gsub("-", "", Sys.Date()), ".rds"))
 
-error_species <- read.csv(paste0("./output/errorfile_", gsub("-", "", Sys.Date()), ".txt"), 
-                          header = FALSE, sep = ",")
-colnames(error_species) <- c("index", "species")
-error_index <- error_species$index
 
 
 ## PREDICTION
@@ -244,25 +236,108 @@ predict_ppms_apply <- function(i, models_list, newdata, bkdat, RCPs = c(26, 85))
   }
 }
 
-
 ## Predict and save output
 newdata <- predxyz
 bkdat <- backxyz200k
 RCPs <- c(26, 85)
-mc.cores <- 1
 prediction_list <- parallel::mclapply(seq_along(model_list), predict_ppms_apply,
                                       model_list, newdata, bkdat, RCPs, mc.cores = mc.cores)
 saveRDS(prediction_list, file = paste0("./output/predlist_",  gsub("-", "", Sys.Date()), ".rds"))
 
 
 
+## LOCATE ERRORS AND RERUN ANALYSIS FOR SPECIES WITH ERROR
+error_species <- read.table("./output/errorfile_20190708.txt", header = FALSE, sep = ",")
+colnames(error_species) <- c("index", "species")
+error_index <- error_species$index
+
+names(model_list) <- tolower(gsub(" ","_", levels(factor(spdat$species))[-error_index]))
+names(prediction_list) <- tolower(gsub(" ","_", levels(factor(spdat$species))[-error_index]))
+
+spdat <- gbif
+bkdat <- backxyz200k
+bkwts <- bkgrd_wts
+spp <- levels(factor(spdat$species))[error_index]
+seq_along(spp)
+mc.cores <- 1
+error_models <- parallel::mclapply(1:length(spp), fit_ppms_apply, spdat, #spwts,
+                                 bkdat, bkwts, interaction_terms, ppm_terms,
+                                 species_names = spp, n.fits=100, mc.cores = mc.cores)
+names(error_models) <- tolower(gsub(" ","_", levels(factor(spdat$species))[error_index]))
+
+newdata <- predxyz
+bkdat <- backxyz200k
+RCPs <- c(26, 85)
+error_pred <- parallel::mclapply(seq_along(error_models), predict_ppms_apply,
+                                 error_models, newdata, bkdat, RCPs, mc.cores = mc.cores)
+names(error_pred) <- tolower(gsub(" ","_", levels(factor(spdat$species))[error_index]))
+
+errorfile <- paste0("./output/errorfile_2_", gsub("-", "", Sys.Date()), ".txt")
+n <- length(model_list)+1
+m <- length(errlist)+1
+error_list <- list()
+for (i in 1:length(error_models)){
+  if(!class(error_models[[i]])[1] == "try-error") {
+    model_list[[n]] <- error_models[[i]]
+    n <- n+1
+  }else{
+    print(paste0("Model ",i, " for '", spp[i], "' has errors"))
+    cat(paste(i, ",", spp[i], "\n"),
+        file = errorfile, append = T)
+    error_list[[m]] <- error_models[[i]]
+    m <- m+1
+  }
+}
+names(model_list)[((length(model_list)-length(error_models))+1):length(model_list)] <- names(error_models)
+
+n <- length(prediction_list) + 1
+for (i in 1:length(error_pred)) {
+  prediction_list[n] <- error_pred[i]  
+  n <- n + 1
+}
+names(prediction_list)[((length(prediction_list)-length(error_pred))+1):length(prediction_list)] <- names(error_pred)
+
+
 ## PLOTTING
-error_sp <- read.csv(paste0("./output/errorfile_", gsub("-", "", Sys.Date()), ".txt"), 
-                     header = FALSE, sep = ",")
-colnames(error_sp) <- c("sp_idx", "sp_name")
-error_idx <- error_sp$sp_idx
-pred_spp <- spp[!spp %in% trimws(as.vector(error_sp$sp_name))]
-  
+## Summed
+mu_current <- matrix(NA, length(prediction_list[[1]]$rcp26), length(prediction_list))
+colnames(mu_current) <- names(prediction_list)
+mu_rcp26 <- matrix(NA, length(prediction_list[[1]]$rcp26), length(prediction_list))
+colnames(mu_rcp26) <- names(prediction_list)
+mu_rcp85 <- matrix(NA, length(prediction_list[[1]]$rcp26), length(prediction_list))
+colnames(mu_rcp85) <- names(prediction_list)
+
+for (i in 1:length(prediction_list)) {
+  mu_current[,i] <- prediction_list[[i]]$current
+  mu_rcp26[,i] <- prediction_list[[i]]$rcp26
+  mu_rcp85[,i] <- prediction_list[[i]]$rcp85
+}
+
+## Site based indices
+richness_current <- rowSums(mu_current)
+pred_current <- rasterFromXYZ(cbind(predxyz[,1:2],richness_current))
+richness_rcp26 <- rowSums(mu_rcp26)
+pred_rcp26 <- rasterFromXYZ(cbind(predxyz[,1:2],richness_rcp26))
+richness_rcp85 <- rowSums(mu_rcp85)
+pred_rcp85 <- rasterFromXYZ(cbind(predxyz[,1:2],richness_rcp85))
+
+## Plot richess for RCP26 and RCP85
+plot(pred_rcp26, main = "@rcp26", ext = extent(global_mask), col = viridisLite::viridis(10), breaks=seq(minValue(pred_rcp26), maxValue(pred_rcp26), length.out = 50), axes=F, box=F, legend = FALSE)
+plot(pred_rcp85, main = "@rcp85", ext = extent(global_mask), col = viridisLite::viridis(10), breaks=seq(minValue(pred_rcp85), maxValue(pred_rcp85), length.out = 50), axes=F, box=F, legend = FALSE)
+
+## copy legend from
+# plot(pred_rcp26, main = "@rcp26", ext = extent(global_mask), col = viridisLite::viridis(10), breaks=seq(minValue(pred_rcp26), maxValue(pred_rcp26), length.out = 11), axes=F, box=F)
+
+## PLot differece in RCP scenarios
+plot(overlay(pred_current, pred_rcp26, fun=function(x,y) as.logical(round(x,2)==round(y,2))), col= c("salmon", "steelblue"), box=FALSE, axes=FALSE, legend = FALSE, main = "Changed expected under RCP 26")
+legend(30, -35, legend = c("change", "no change"), fill=c("salmon", "steelblue"), bty = "n", cex = 1)
+
+plot(overlay(pred_current, pred_rcp85, fun=function(x,y) as.logical(round(x,2)==round(y,2))), col= c("salmon", "steelblue"), box=FALSE, axes=FALSE, legend = FALSE, main = "Changed expected under RCP 85")
+legend(30, -35, legend = c("change", "no change"), fill=c("salmon", "steelblue"), bty = "n", cex = 1)
+
+
+## By species
+pred_spp <- spp[!spp %in% trimws(as.vector(error_species$sp_name))]
   
 for (i in 1:length(prediction_list)){
   
@@ -284,6 +359,28 @@ for (i in 1:length(prediction_list)){
 
 
 ## EXTRAS
+
+## Function: Catch errors in model outputs
+##  (1) List of outputs for models without errors, 
+##  (2) list of outputs for models with errors, 
+##  (3) text file with list of models with errors (species indices and species names) 
+catch_errors <- function(i, ppm_models, species_names, errorfile) {
+  cat('Checking model for ', species_names[i],'for errors\n')
+  for(i in 1:length(ppm_models)){
+    if(!class(ppm_models[[i]])[1] == "try-error") {
+      model_list[[n]] <- ppm_models[[i]]
+      n <- n+1
+    }else{
+      print(paste0("Model ",i, " for '", spp[i], "' has errors"))
+      cat(paste(i, ",", spp[i], "\n"),
+          file = errorfile, append = T)
+      error_list[[m]] <- ppm_models[[i]]
+      m <- m+1
+    }
+  }
+}
+
+catch_errors(seq_along(error_models), ppm_models = model_list, species_names = spp, errorfile = errorfile)
 
 ## TESTING FOR CORRELATED VARIABLES
 ## There is no hard and fast rule about how many covariates to fit to data, and it will change depending on the data and the amount of information in each observation and how they vary with the covariates, how the covariates are correlated ect... But to start I'd only fit sqrt(n_observations) covariates. So if you have 20 occurrences that's 4-5 covariates (including the polynomials) so that's only two variables! You might have to identify the most important variable and start from there.
