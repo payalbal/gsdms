@@ -97,9 +97,9 @@ bkgrd_wts <- c(totarea/area_offset)
 
 ## SPECIFY MODEL
 ## Function: PPM model        
-fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms, species_names, n.fits=50) {
+fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms, species_names, n.fits=50, min.obs = 50) {
    
-    cat('Fitting a ppm to', species_names[i],'\nThis is the', i,'^th model of',length(species_names),'\n')
+  cat('Fitting a ppm to', species_names[i],'\nThis is the', i,'^th model of',length(species_names),'\n')
   logfile <- paste0("./output/ppm_log_",gsub(" ","_",species_names[i]),"_",gsub("-", "", Sys.Date()), ".txt")
   writeLines(c(""), logfile)
   spxy <- spdat[spdat$species %in% species_names[i], c(4,3)]
@@ -122,23 +122,22 @@ fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms,
     ppmxyz[ppmxyz$Pres == 1,]$wt <- 1e-6 #spwts[[i]]
     
     ## Specify PPM formula based on number of observations for a species
-    nk <- ceiling(sqrt(nrow(spxy)))
+    ##  We use the one-in-ten rule:  https://en.wikipedia.org/wiki/One_in_ten_rule
+    ##  where, an additional covariate is added for every additonal ten obeservations.
+    ##  Since we fit poly with degree 2, adding a covariate will add two terms x and x^2 to the model
+    ##  To operationalize this rule therefore, we need to add 1 raw covariate for every 20 additional observations.
+    ##  At >230 observations, all 10 covariates will be fit in addition to lat long (i.e. 12 covariates in all)
+    nk <- nrow(spxyz)
     
-    ## if low number of observations, i.e. nrow(spxy) =< 25, only use the spatial covariates (linear, quadratic with interaction)
-    if(nk <= 5){ ## 5 because linear, quadratic with interaction for X ad Y gives 5 terms
+    ## if number of observations <= min.obs, only use the spatial covariates i.e. lat and long
+    ##  this gives 5 terms: X, Y, X^2, Y^2, X:Y (linear, quadratic with interaction)
+    ##  so, min.obs is set to 50 by deault
+    if(nk <= min.obs){
       ppmform <- formula(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
                                              ", degree = 2, raw = FALSE)",collapse =""))
-      ## including land-use change even for species with low number of observations
-      # paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
-      #        ", degree = 2, raw = FALSE) + poly(landuse, degree = 2, raw = FALSE)",collapse ="")
-      
     } else  {
-      ## if number of observations > 25, fit additional covariates as independent with linear and quadratic terms
-      ## addition of covariates is based on the order of covariates in stack/grid, starting with landuse, 
-      ## see names(covariates) for order
-      ## implies a priority of covariates ...NOT QUITE RIGHT PERHAPS?
-      extra_covar <- ceiling((nk - 5)/2)
-      if(extra_covar > 10) extra_covar <- 10 ## if enough observations, fit all parameters
+      extra_covar <- ceiling((nk - min.obs)/20)
+      if(extra_covar > 10) extra_covar <- 10 ## Fit all covariates
       ppmform <- formula(paste0(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
                                        ", degree = 2, raw = FALSE)"), 
                                 paste0(" + poly(", ppm_terms[!(ppm_terms %in% interaction_terms)][1:extra_covar],
@@ -154,6 +153,9 @@ fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms,
         file = logfile, append = T)
 
     mod <- try(ppmlasso(formula = ppmform, data = ppmxyz, n.fits = n.fits, criterion = "bic",standardise = FALSE), silent=TRUE)
+    cat(paste("Warnings for", species_names[i],"\n", warnings(),"\n"), 
+        file = logfile, append = T)
+    cat('Warnings for ', species_names[i],':\n', warnings(),'\n')
     gc()
     return(mod)
   } else {
@@ -170,7 +172,7 @@ spp <- levels(factor(spdat$species))
 seq_along(spp)
 ppm_models <- parallel::mclapply(1:length(spp), fit_ppms_apply, spdat, #spwts,
                            bkdat, bkwts, interaction_terms, ppm_terms, 
-                           species_names = spp, n.fits=100, mc.cores = mc.cores)
+                           species_names = spp, n.fits=100, min.obs = 50, mc.cores = mc.cores)
 
 ## Catch errors in models & save outputs
 error_list <- list()
@@ -247,6 +249,8 @@ saveRDS(prediction_list, file = paste0("./output/predlist_",  gsub("-", "", Sys.
 
 
 ## LOCATE ERRORS AND RERUN ANALYSIS FOR SPECIES WITH ERROR
+##  To be automated if error problem is not solved by species grouping
+##  At the moment, it appears that error might be when species data is spatially restricted.
 error_species <- read.table("./output/errorfile_20190708.txt", header = FALSE, sep = ",")
 colnames(error_species) <- c("index", "species")
 error_index <- error_species$index
@@ -262,7 +266,7 @@ seq_along(spp)
 mc.cores <- 1
 error_models <- parallel::mclapply(1:length(spp), fit_ppms_apply, spdat, #spwts,
                                  bkdat, bkwts, interaction_terms, ppm_terms,
-                                 species_names = spp, n.fits=100, mc.cores = mc.cores)
+                                 species_names = spp, n.fits=100, min.obs = 50, mc.cores = mc.cores)
 names(error_models) <- tolower(gsub(" ","_", levels(factor(spdat$species))[error_index]))
 
 newdata <- predxyz
@@ -298,69 +302,15 @@ for (i in 1:length(error_pred)) {
 names(prediction_list)[((length(prediction_list)-length(error_pred))+1):length(prediction_list)] <- names(error_pred)
 
 
-## PLOTTING
-## Summed
-mu_current <- matrix(NA, length(prediction_list[[1]]$rcp26), length(prediction_list))
-colnames(mu_current) <- names(prediction_list)
-mu_rcp26 <- matrix(NA, length(prediction_list[[1]]$rcp26), length(prediction_list))
-colnames(mu_rcp26) <- names(prediction_list)
-mu_rcp85 <- matrix(NA, length(prediction_list[[1]]$rcp26), length(prediction_list))
-colnames(mu_rcp85) <- names(prediction_list)
-
-for (i in 1:length(prediction_list)) {
-  mu_current[,i] <- prediction_list[[i]]$current
-  mu_rcp26[,i] <- prediction_list[[i]]$rcp26
-  mu_rcp85[,i] <- prediction_list[[i]]$rcp85
-}
-
-## Site based indices
-richness_current <- rowSums(mu_current)
-pred_current <- rasterFromXYZ(cbind(predxyz[,1:2],richness_current))
-richness_rcp26 <- rowSums(mu_rcp26)
-pred_rcp26 <- rasterFromXYZ(cbind(predxyz[,1:2],richness_rcp26))
-richness_rcp85 <- rowSums(mu_rcp85)
-pred_rcp85 <- rasterFromXYZ(cbind(predxyz[,1:2],richness_rcp85))
-
-## Plot richess for RCP26 and RCP85
-plot(pred_rcp26, main = "@rcp26", ext = extent(global_mask), col = viridisLite::viridis(10), breaks=seq(minValue(pred_rcp26), maxValue(pred_rcp26), length.out = 50), axes=F, box=F, legend = FALSE)
-plot(pred_rcp85, main = "@rcp85", ext = extent(global_mask), col = viridisLite::viridis(10), breaks=seq(minValue(pred_rcp85), maxValue(pred_rcp85), length.out = 50), axes=F, box=F, legend = FALSE)
-
-## copy legend from
-# plot(pred_rcp26, main = "@rcp26", ext = extent(global_mask), col = viridisLite::viridis(10), breaks=seq(minValue(pred_rcp26), maxValue(pred_rcp26), length.out = 11), axes=F, box=F)
-
-## PLot differece in RCP scenarios
-plot(overlay(pred_current, pred_rcp26, fun=function(x,y) as.logical(round(x,2)==round(y,2))), col= c("salmon", "steelblue"), box=FALSE, axes=FALSE, legend = FALSE, main = "Changed expected under RCP 26")
-legend(30, -35, legend = c("change", "no change"), fill=c("salmon", "steelblue"), bty = "n", cex = 1)
-
-plot(overlay(pred_current, pred_rcp85, fun=function(x,y) as.logical(round(x,2)==round(y,2))), col= c("salmon", "steelblue"), box=FALSE, axes=FALSE, legend = FALSE, main = "Changed expected under RCP 85")
-legend(30, -35, legend = c("change", "no change"), fill=c("salmon", "steelblue"), bty = "n", cex = 1)
-
-
-## By species
-pred_spp <- spp[!spp %in% trimws(as.vector(error_species$sp_name))]
-  
-for (i in 1:length(prediction_list)){
-  
-  png(file = paste0("./output/plot_",tolower(gsub(" ","",pred_spp[i])), ".png"),
-      width=1500, height=600, res = 130, pointsize = 12)
-  par(mfrow = c(1,2))
-  par(mar=c(3,3,5,7))
-  
-  preds_sp <- rasterFromXYZ(cbind(predxyz[,1:2],prediction_list[[i]]))
-  plot(preds_sp$rcp26, main = "rcp26", ext = extent(global_mask))
-  points(spdat[spdat$species == pred_spp[i], c(4,3)], pch=16, cex=.3)
-  plot(preds_sp$rcp85, main = "rcp85", ext = extent(global_mask))
-  points(spdat[spdat$species == pred_spp[i], c(4,3)], pch=16, cex=.3)
-  mtext(pred_spp[i], side = 3, line = -2, outer = TRUE, cex = 1.5, font = 2)
-  rm(preds_sp)
-  dev.off()
-}
 
 
 
+
+## -----------------------------------------------------------------------------
 ## EXTRAS
+## -----------------------------------------------------------------------------
 
-## Function: Catch errors in model outputs
+## FUNCTION: Catch errors in model outputs
 ##  (1) List of outputs for models without errors, 
 ##  (2) list of outputs for models with errors, 
 ##  (3) text file with list of models with errors (species indices and species names) 
@@ -379,11 +329,13 @@ catch_errors <- function(i, ppm_models, species_names, errorfile) {
     }
   }
 }
-
 catch_errors(seq_along(error_models), ppm_models = model_list, species_names = spp, errorfile = errorfile)
+
 
 ## TESTING FOR CORRELATED VARIABLES
 ## There is no hard and fast rule about how many covariates to fit to data, and it will change depending on the data and the amount of information in each observation and how they vary with the covariates, how the covariates are correlated ect... But to start I'd only fit sqrt(n_observations) covariates. So if you have 20 occurrences that's 4-5 covariates (including the polynomials) so that's only two variables! You might have to identify the most important variable and start from there.
+
+## see slide 14 & 26 in: http://www.bo.astro.it/~school/school09/Presentations/Bertinoro09_Jasper_Wall_3.pdf
 
 ## let's do a PCA on the data to work out which are the most variable coefs.
 Xoriginal=t(as.matrix(backxyz200k))
