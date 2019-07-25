@@ -22,7 +22,7 @@ dim(phascogalepirata)
 plot(raw_mask, legend = FALSE)
 points(nangerdama[,c(4,3)], col = "black", cex = 0.5)
 points(notomysaquilo[,c(4,3)], col = "red", cex = 0.5)
-points(phascogalepirata[,c(4,3)], col = "blue", cex = 0.5)
+points(phascogalepirata[,c(4,3)], col = "blue", cex = 0.5)        
 
 
 ## Plot all

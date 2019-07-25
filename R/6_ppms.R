@@ -9,8 +9,9 @@
 
 ## SET UP WORKSPACE
 pacman::p_load(sp, raster, spatstat.data, nlme, rpart, spatstat, ppmlasso, 
-       parallel, doParallel, doMC)
-mc.cores <- 30 ## for boab
+               parallel, doParallel, doMC)
+# mc.cores <- 30 ## for boab
+mc.cores <- 1
 
 ## Create 'output' folder
 if(!dir.exists("./output")) {
@@ -45,12 +46,12 @@ backxyz <- na.omit(cbind(backxyz, as.matrix(covariates)))
 backxyz200k <- backxyz[sample(nrow(backxyz), 200000), ]
 backxyz200k$Pres <- rep(0, dim(backxyz200k)[1])
 
-  # ## Checks
-  # summary(covariates)
-  # summary(backxyz200k)
-  # plot(global_mask0, legend = FALSE)
-  # plot(rasterFromXYZ(backxyz200k[,1:3]), col = "black", add = TRUE, legend=FALSE)
-  
+# ## Checks
+# summary(covariates)
+# summary(backxyz200k)
+# plot(global_mask0, legend = FALSE)
+# plot(rasterFromXYZ(backxyz200k[,1:3]), col = "black", add = TRUE, legend=FALSE)
+
 ## Prediction points 
 predxyz <- data.frame(rpts@data, X=coordinates(rpts)[,1], Y=coordinates(rpts)[,2])     
 predxyz <- predxyz[,-1]
@@ -70,49 +71,83 @@ lambdaseq <- round(sort(exp(seq(-10, log(100 + 1e-05), length.out = 20)),
                         decreasing = TRUE),5)
 
 ## Estimate weights for background points
-  ## calculate the area of the globe and then work out the weights based on the total area divided by number of points
+## calculate the area of the globe and then work out the weights based on the total area divided by number of points
 ar <- raster::area(global_mask0)
 ar <- mask(ar,global_mask)
 totarea <- cellStats(ar,'sum')*1000 ## in meters^2
 area_offset <- extract(ar, backxyz200k[,c('X','Y')], small = TRUE, fun = mean, na.rm = TRUE)*1000 ## in meters
 bkgrd_wts <- c(totarea/area_offset)
 
-  ## Estimate species weights - but it's not quite right
-  # spdat <- gbif
-  # species_names <- levels(factor(spdat$species))
-  # spwts <- list()
-  # for(i in seq_along(species_names)){
-  #       print(i)
-  #       spxy <- spdat[spdat$species %in% species_names[i], c(4,3)]
-  #       names(spxy) <- c("X", "Y")
-  #       cellNo <- cellFromXY(ar,spxy)
-  #       cellNoCounts <- table(cellNo)
-  #       tmp_cell_area <- extract(ar, spxy, fun = mean, na.rm = TRUE)*1000
-  #       tmp_dat <- data.frame(area=tmp_cell_area,cell_number=cellNo)
-  #       tmp_wts <- ((tmp_dat$area*1000)/cellNoCounts[as.character(cellNo)])/totarea
-  #       spwts[[i]] <- tmp_wts
-  # }
+## Estimate species weights - but it's not quite right
+# spdat <- gbif
+# species_names <- levels(factor(spdat$species))
+# spwts <- list()
+# for(i in seq_along(species_names)){
+#       print(i)
+#       spxy <- spdat[spdat$species %in% species_names[i], c(4,3)]
+#       names(spxy) <- c("X", "Y")
+#       cellNo <- cellFromXY(ar,spxy)
+#       cellNoCounts <- table(cellNo)
+#       tmp_cell_area <- extract(ar, spxy, fun = mean, na.rm = TRUE)*1000
+#       tmp_dat <- data.frame(area=tmp_cell_area,cell_number=cellNo)
+#       tmp_wts <- ((tmp_dat$area*1000)/cellNoCounts[as.character(cellNo)])/totarea
+#       spwts[[i]] <- tmp_wts
+# }
 
 
 
 ## SPECIFY MODEL
 ## Function: PPM model        
 fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms, species_names, n.fits=50, min.obs = 50) {
-   
+  
+  ## Initialise log file
   cat('Fitting a ppm to', species_names[i],'\nThis is the', i,'^th model of',length(species_names),'\n')
   logfile <- paste0("./output/ppm_log_",gsub(" ","_",species_names[i]),"_",gsub("-", "", Sys.Date()), ".txt")
   writeLines(c(""), logfile)
+  
+  ## Definne species specific data & remove NA (if any)
   spxy <- spdat[spdat$species %in% species_names[i], c(4,3)]
   names(spxy) <- c("X", "Y")
-  spxyz <- extract(covariates, spxy, buffer = 1000000, small = TRUE, 
+  
+  ## Extract covariates for presence points
+  
+  ## For landuse: Take the raster value with lowest distance to point AND non-NA value in the raster
+  ## ---- takes very logn to run; fidn alternative ----
+  r = covariates[[1]] ## landuse raster
+  spxy_landuse <- apply(X = spxy, MARGIN = 1, FUN = function(X) r@data@values[which.min(replace(distanceFromPoints(r, X), is.na(r), NA))])
+  ## spxy_landuse <- extract(r, spxy, method='simple', na.rm=TRUE, factor = TRUE) still gives NAs...
+  # ## Check: Compare if non-NA values match with extract()
+  # spxy_landuse_extract <- extract(covariates[[1]], spxy, method = 'simple') ## gives NAs
+  # spxy_landuse_extract[which(!is.na(spxy_landuse_extract))] == spxy_landuse[which(!is.na(spxy_landuse_extract))]
+  
+  ## For other covariates: extract() using buffer
+  spxyz <- extract(covariates[[-1]], spxy, buffer = 1000000, small = TRUE, 
                    fun = mean, na.rm = TRUE)
   
-  spxyz <- cbind(spxy, spxyz)
-  
-  ## Remove remaining NA values & add check for < 20 records
+  spxyz <- cbind(spxy, spxy_landuse, spxyz)
+  names(spxyz)[3] <- "landuse"
   spxyz <- na.omit(spxyz)
-  if (!(dim(spxyz)[1] < 20)) {
-    ## if number of observations > 20, fit a model otherwise not.
+  
+  ## Specify model based on number of observatios
+  ## If number of observations < 20, do not fit a model.
+  ## If number of observations >= 20, fit a model accordig to the followig rule:
+  ##  1. If number of observations <= min.obs (deafult as 50), 
+  ##    use only the spatial covariates i.e. lat and long. This gives 5 
+  ##    terms: X, Y, X^2, Y^2, X:Y (linear, quadratic with interaction)
+  ##  2. .... 50 - 90
+  ##  2. If number of observatons > min.obs, 
+  ##    use the one-in-ten rule (https://en.wikipedia.org/wiki/One_in_ten_rule)
+  ##    where, an additional covariate is added for every 10 additonal obeservations.
+  ##    Because we fit poly with degree 2, adding a covariate will add two 
+  ##    terms x and x^2 to the model. Therefore, to operationalize this rule, 
+  ##    we add 1 raw covariate for every 20 additional observations. All 10
+  ##    covariates (in addition to lat long) are fit onlt at > 230 observations.
+  ##    There are 12 covariates in all includign lat and log. 
+  
+  nk <- nrow(spxyz)
+  if (!(nk < 20)) {
+    
+    ## Add presence column to species occurrence table
     spxyz$Pres <- rep(1, dim(spxyz)[1])
     
     ## Specify weights for PPM data
@@ -121,29 +156,23 @@ fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms,
     ppmxyz[ppmxyz$Pres == 0,]$wt <- bkwts
     ppmxyz[ppmxyz$Pres == 1,]$wt <- 1e-6 #spwts[[i]]
     
-    ## Specify PPM formula based on number of observations for a species
-    ##  We use the one-in-ten rule:  https://en.wikipedia.org/wiki/One_in_ten_rule
-    ##  where, an additional covariate is added for every additonal ten obeservations.
-    ##  Since we fit poly with degree 2, adding a covariate will add two terms x and x^2 to the model
-    ##  To operationalize this rule therefore, we need to add 1 raw covariate for every 20 additional observations.
-    ##  At >230 observations, all 10 covariates will be fit in addition to lat long (i.e. 12 covariates in all)
-    nk <- nrow(spxyz)
-    
-    ## if number of observations <= min.obs, only use the spatial covariates i.e. lat and long
-    ##  this gives 5 terms: X, Y, X^2, Y^2, X:Y (linear, quadratic with interaction)
-    ##  so, min.obs is set to 50 by deault
+    ## Specify PPM formula based on number of observations
     if(nk <= min.obs){
       ppmform <- formula(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
-                                             ", degree = 2, raw = FALSE)",collapse =""))
-    } else  {
-      extra_covar <- ceiling((nk - min.obs)/20)
-      if(extra_covar > 10) extra_covar <- 10 ## Fit all covariates
-      ppmform <- formula(paste0(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
-                                       ", degree = 2, raw = FALSE)"), 
-                                paste0(" + poly(", ppm_terms[!(ppm_terms %in% interaction_terms)][1:extra_covar],
-                                       ", degree = 2, raw = FALSE)", 
-                                       collapse = ""), collapse =""))
+                                ", degree = 2, raw = FALSE)",collapse =""))
+    } else {
+      if(nk > min.obs & nk <= min.obs + 40){
+        ppmform <- formula(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
+                                  ", degree = 2, raw = FALSE) + factor(landuse)",collapse ="")) 
+      } else {
+        extra_covar <- ceiling((nk - min.obs)/20)
+        if(extra_covar > 10) extra_covar <- 10 ## Fit all 10 covariates
+        ppmform <- formula(paste0(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
+                                         ", degree = 2, raw = FALSE) + factor(landuse)"), 
+                                  paste0(" + poly(", ppm_terms[!(ppm_terms %in% c(interaction_terms, "landuse"))][1:extra_covar],", degree = 2, raw = FALSE)", collapse = ""), collapse =""))
+      }
     }
+    
     ## Fit ppm & save output
     cat(paste("\nFitting ppm model for",i , " @ ", Sys.time(), "\n"), 
         file = logfile, append = T)
@@ -151,17 +180,24 @@ fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms,
         file = logfile, append = T)
     cat(paste("   # extracted records for",i , " = ", dim(spxyz)[1], "\n"), 
         file = logfile, append = T)
-
-    mod <- try(ppmlasso(formula = ppmform, data = ppmxyz, n.fits = n.fits, criterion = "bic",standardise = FALSE), silent=TRUE)
-    cat(paste("Warnings for", species_names[i],"\n", warnings(),"\n"), 
-        file = logfile, append = T)
-    cat('Warnings for ', species_names[i],':\n', warnings(),'\n')
+    
+    mod <- try(ppmlasso(formula = ppmform, data = ppmxyz, n.fits = n.fits, 
+                        criterion = "bic", standardise = FALSE), silent=TRUE)
+    # cat('Warnings for ', species_names[i],':\n')
+    # warnings()
+    
+    # ## capture messages and errors to a file
+    # sink(logfile, type = "message", append = TRUE, split = FALSE)
+    # try(warnings())
+    # ## reset message sink and close the file connection
+    # sink(type="message")
+    # close(logfile)
+    
     gc()
     return(mod)
   } else {
     return(NULL)
   }
-  
 }
 
 ## Fit models
@@ -171,8 +207,8 @@ bkwts <- bkgrd_wts
 spp <- levels(factor(spdat$species))
 seq_along(spp)
 ppm_models <- parallel::mclapply(1:length(spp), fit_ppms_apply, spdat, #spwts,
-                           bkdat, bkwts, interaction_terms, ppm_terms, 
-                           species_names = spp, n.fits=100, min.obs = 50, mc.cores = mc.cores)
+                                 bkdat, bkwts, interaction_terms, ppm_terms, 
+                                 species_names = spp, n.fits=100, min.obs = 50, mc.cores = mc.cores)
 
 ## Catch errors in models & save outputs
 error_list <- list()
@@ -251,7 +287,7 @@ saveRDS(prediction_list, file = paste0("./output/predlist_",  gsub("-", "", Sys.
 ## LOCATE ERRORS AND RERUN ANALYSIS FOR SPECIES WITH ERROR
 ##  To be automated if error problem is not solved by species grouping
 ##  At the moment, it appears that error might be when species data is spatially restricted.
-error_species <- read.table("./output/errorfile_20190708.txt", header = FALSE, sep = ",")
+error_species <- read.table("./output/errorfile_1_20190725.txt", header = FALSE, sep = ",")
 colnames(error_species) <- c("index", "species")
 error_index <- error_species$index
 
@@ -265,8 +301,8 @@ spp <- levels(factor(spdat$species))[error_index]
 seq_along(spp)
 mc.cores <- 1
 error_models <- parallel::mclapply(1:length(spp), fit_ppms_apply, spdat, #spwts,
-                                 bkdat, bkwts, interaction_terms, ppm_terms,
-                                 species_names = spp, n.fits=100, min.obs = 50, mc.cores = mc.cores)
+                                   bkdat, bkwts, interaction_terms, ppm_terms,
+                                   species_names = spp, n.fits=100, min.obs = 50, mc.cores = mc.cores)
 names(error_models) <- tolower(gsub(" ","_", levels(factor(spdat$species))[error_index]))
 
 newdata <- predxyz
