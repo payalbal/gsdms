@@ -109,7 +109,31 @@ fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms,
   spxy <- spdat[spdat$species %in% species_names[i], c(4,3)]
   names(spxy) <- c("X", "Y")
   
+  ## see points
+  # plot(global_mask, ext = extent(xmin, xmax, ymin, ymax))
+  # points(spxy)  
+  
+  ## Move species occurrence points fallong off the mask to nearest 'land' cells
+  # find points which fall in NA areas on the raster
+  vals <- extract(global_mask, spxy)
+  outside_mask <- is.na(vals)
+  outside_pts <- spxy[outside_mask, ]
+  # find the nearest land within 5 decimal degrees of these
+  land <- nearestLand(outside_pts, global_mask, 1000000)
+  # count how many were moved
+  sum(!is.na(land[, 1]))
+  # and how many were too far out
+  sum(is.na(land[, 1]))
+  # replace points falling in NA with new points on nearest land
+  spxy[outside_mask, ] <- land
+  ## PROBLEM: We lose data again i.e. number of unique locations is reduced. This can be problematic for ppms...
+  nrow(unique(outside_pts))
+  nrow(unique(land))
+  
+  
   ## Extract covariates for presence points
+  
+  
   
   ## For landuse: Take the raster value with lowest distance to point AND non-NA value in the raster
   ## ---- takes very logn to run; fidn alternative ----

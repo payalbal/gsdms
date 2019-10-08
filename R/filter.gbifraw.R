@@ -3,8 +3,8 @@
 ##'
 ##'@description Filters csv data downloaded from GBIF.
 ##'
-##'@param gbif.download.data (data.table) A data.table holding the downloaded GBIF data. GBIF.org 15th October 2018 GBIF Occurrence Download https://doi.org/10.15468/dl.g2zaxo
-##'@param gbif.nub.taxonomy (data.table) A data.table holding the downloaded GBIF backbone taxonomy. 5 February 2018 https://www.gbif.org/dataset/d7dddbf4-2cf0-4f39-9b2a-bb099caae36c#description
+##'@param gbif.download.data (data.table) A data.table holding the downloaded GBIF data.
+##'@param gbif.nub.taxonomy (data.table) A data.table holding the downloaded GBIF backbone taxonomy.
 ##'@param subset.gbifnubtaxonomy.byclass (string) Optional - Character string to subset gbif.nub.taxonomy by class. Default: NULL
 ##'@param output_folder (string) A folder to save the outputs to. If none specified, no file is written.
 ##'@param output_name (string) A name to use in saving the outputs. Default: 'filtered_data'.
@@ -44,7 +44,7 @@
 ## 4. Catgorise species accroding to binned occurrence records to allow fitting different (simple vs complex) models depending on the data available. See Merow et al 2013 for ideas. 
 
 
-filter_gbif_raw = function (gbif.downloaded.data,
+filter.gbifraw = function (gbif.downloaded.data,
                              gbif.nub.taxonomy,
                              subset.gbifnubtaxonomy.byclass,
                              output_folder = NULL,
@@ -179,7 +179,7 @@ filter_gbif_raw = function (gbif.downloaded.data,
     if(!dir.exists(output_folder))
     {
       dir.create(output_folder)
-    } # end if !dir.exists
+    }  # end if !dir.exists
     
     output_path <- file.path(output_folder,paste0(Sys.Date(), "_", output_name,".csv"))
     write.csv(dat, output_path, row.names=FALSE)
