@@ -11,7 +11,7 @@
 ##'@param domain.mask (raster layer) A raster layer specifying the analysis domain
 ##'@param start.year (integer) The earliest year for which data will be retained  Default: 1970.
 ##'@param end.year (integer) The latest year for which data will be retained  Default: 2018
-##'@param spatial.uncertainty.m (float) The distance (m) for spatial uncertainty below which data will be retained. Default: 10000 mts.
+##'@param spatial.uncertainty.m (float) The distance (m) for spatial uncertainty below which data will be retained. Default: 1000 mts.
 ##'@param filter_fields (string) GBIF data fields, i.e. columns, that will be reatined for the purpose of filtering
 ##'@param filter_basisofrecord (string)
 ##'@param issue_geospatial (string) Geospatial issues to exclude from the output dataset. Default: "ZERO_COORDINATE", "COORDINATE_INVALID",
@@ -44,7 +44,7 @@
 ## 4. Catgorise species accroding to binned occurrence records to allow fitting different (simple vs complex) models depending on the data available. See Merow et al 2013 for ideas. 
 
 
-filter.gbifraw = function (gbif.downloaded.data,
+filter.gbifcsv = function (gbif.downloaded.data,
                              gbif.nub.taxonomy,
                              subset.gbifnubtaxonomy.byclass,
                              output_folder = NULL,
@@ -52,7 +52,7 @@ filter.gbifraw = function (gbif.downloaded.data,
                              domain.mask = NULL,
                              start.year = 1950,
                              end.year = 2018,
-                             spatial.uncertainty.m = 10000,
+                             spatial.uncertainty.m = 1000,
                              filter_fields = c("gbifid", "occurrenceid", "species", "scientificname", "countrycode",
                                                "decimallatitude", "decimallongitude", "coordinateuncertaintyinmeters",
                                                "coordinateprecision", "elevation", "elevationaccuracy", "depth",

@@ -12,7 +12,7 @@
 ##'@param start.year (integer) The earliest year for which data will be retained  Default: 1970.
 ##'@param end.year (integer) The latest year for which data will be retained  Default: 2018
 ##'@param remove_duplicates (boolean) To include or exclude spatial duplicates. Deafult TRUE excludes. 
-##'@param spatial.uncertainty.m (float) Distance (m) threshold applied to field coordinateuncertaintyinmeters if provided for inclusion of records. Default: 100000 mts.
+##'@param spatial.uncertainty.m (float) Distance (m) threshold applied to field coordinateuncertaintyinmeters if provided for inclusion of records. Default: 1000 mts.
 ##'@param filter_fields (string) GBIF data fields, i.e. columns, that will be reatined for the purpose of filtering
 ##'@param filter_basisofrecord (string)
 ##'@param issue_geospatial (string) Geospatial issues to exclude from the output dataset. Default: "ZERO_COORDINATE", "COORDINATE_INVALID",
@@ -46,7 +46,7 @@ filter.gbif = function (gbif.downloaded.data,
                         start.year = 1950,
                         end.year = 2018,
                         remove_duplicates = TRUE,
-                        spatial.uncertainty.m = 100000,
+                        spatial.uncertainty.m = 1000,
                         filter_fields = c("gbifid", "species", "scientificname", 
                                           "countrycode", "decimallatitude", 
                                           "decimallongitude", "coordinateuncertaintyinmeters",

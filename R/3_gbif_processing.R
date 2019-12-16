@@ -1,3 +1,9 @@
+## ---- [UNDER DEV WITH MDAP TEAM] ---- ##
+## Contibutors:
+## 
+## Add script: gbif_newdb_for_gsdms.R
+
+
 ## ------------------------------------------------------
 ## Set work environment
 ## ------------------------------------------------------
@@ -14,27 +20,30 @@ source("./R/connect_to_server.R")
 ## ------------------------------------------------------
 ## Catch original number of records
 ## ------------------------------------------------------
-## Records in the online GBIF database
-## To search for taxon key, see: https://github.com/gbif/portal-feedback/issues/1820
+## All records in the online GBIF database
 paste("# Total records in GBIF database as of",  Sys.Date(), "=", occ_count())
 
-  # paste("# records in GBIF database for Aves = ", 
-  #       occ_count(taxonKey = 212, georeferenced = TRUE))
-  # paste("# records in GBIF database for Aves with coordinates = ", 
-  #       occ_data(taxonKey = 212, hasCoordinate = TRUE, 
-  #                hasGeospatialIssue = FALSE)$meta$count)
-  # 
-  # paste("# records in GBIF database for Mammalia = ", 
-  #       occ_count(taxonKey = 359, georeferenced = TRUE))
-  # paste("# records in GBIF database for Mammalia with coordinates = ",
-  #       occ_data(taxonKey = 359, hasCoordinate = TRUE, 
-  #                hasGeospatialIssue = FALSE)$meta$count)
-  # 
-  # paste("# records in GBIF database for Reptilia = ", 
-  #       occ_count(taxonKey = 358, georeferenced = TRUE))
-  # paste("# records in GBIF database for Reptilia with coordinates = ", 
-  #       occ_data(taxonKey = 358, hasCoordinate = TRUE, 
-  #                hasGeospatialIssue = FALSE)$meta$count)
+  ## Records for mammals, repltiles, amphibians and birds from GBIF db
+  ## To search for taxon key, see: https://github.com/gbif/portal-feedback/issues/1820
+    # paste("# records in GBIF database for Aves = ", 
+    #       occ_count(taxonKey = 212, georeferenced = TRUE))
+    # paste("# records in GBIF database for Aves with coordinates = ", 
+    #       occ_data(taxonKey = 212, hasCoordinate = TRUE, 
+    #                hasGeospatialIssue = FALSE)$meta$count)
+    # 
+    # paste("# records in GBIF database for Mammalia = ", 
+    #       occ_count(taxonKey = 359, georeferenced = TRUE))
+    # paste("# records in GBIF database for Mammalia with coordinates = ",
+    #       occ_data(taxonKey = 359, hasCoordinate = TRUE, 
+    #                hasGeospatialIssue = FALSE)$meta$count)
+    # 
+    # paste("# records in GBIF database for Reptilia = ", 
+    #       occ_count(taxonKey = 358, georeferenced = TRUE))
+    # paste("# records in GBIF database for Reptilia with coordinates = ", 
+    #       occ_data(taxonKey = 358, hasCoordinate = TRUE, 
+    #                hasGeospatialIssue = FALSE)$meta$count)
+    # ... add amphibians
+
 
 ## Records (rows) in the download gbif data
 paste0("# records (estd.) in downloaded GBIF csv file = ",

@@ -11,8 +11,7 @@
 ##'@param domain.mask (raster layer) A raster layer specifying the analysis domain
 ##'@param remove_duplicates (boolean) To include or exclude spatial duplicates. Deafult TRUE excludes. 
 ##'@param filter_fields (string) GBIF data fields, i.e. columns, that will be reatined for the purpose of filtering
-##'@param select_fields (string) List of data fields to be returned in the output dataset. Default: "gbifid", "species", "decimallatitude", 
-##'"decimallongitude", "taxonkey"
+##'@param select_fields (string) List of data fields to be returned in the output dataset. Default: "gbifid", "species", "decimallatitude", "decimallongitude", "taxonkey"
 ##'@param verbose (boolean) Print messages to console. Default TRUE.
 ##'
 ##'@return data.table

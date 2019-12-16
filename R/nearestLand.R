@@ -1,4 +1,5 @@
-## FUNCTIONS FROM NICK GOULDING
+## Author: Nick Goulding
+## Notes: Not suitable for 
 
 
 nearestLand <- function (points, raster, max_distance) {

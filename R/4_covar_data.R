@@ -13,6 +13,9 @@ setwd()
 data_covs <- "/Volumes/discovery_data/gsdms_data" # local
 
 
+## --------------------------------
+## Data download
+## --------------------------------
 ## WorldClim data - download tiles and stitch to make global layer
 ## Source: https://www.worldclim.org/version1
 ## author: Chris Ware
@@ -89,9 +92,40 @@ for (i in 1:19){
 ## Future Bioclim for Year: 2070, GCM: BCC-CSM1-1
 url_bc85bi70 = "http://biogeo.ucdavis.edu/data/climate/cmip5/30s/bc85bi70.zip"
 url_bc26bi70 = "http://biogeo.ucdavis.edu/data/climate/cmip5/30s/bc26bi70.zip"
-
 download_from_url(urls = c(url_bc26bi70, url_bc85bi70), zipdst, rasterdst)
 
+  ## --------- GCMs -------------------------------------------
+  ## Get urls
+  ##  Select GCMs for which data is available for all required rcps
+  ##  See: https://www.worldclim.org/cmip5_30s
+  rcps <- c("45", "60", "85")
+  models <- c("BC", "CC", "GS", "HD", "HE", "IP", "MI", "MR", "MC", "MG", "NO")
+  urls_bioclim = NULL
+  for (model_i in models){
+    for (rcp_j in rcps){
+      fn = paste0(tolower(model_i), rcp_j, 'bi70', '.zip')
+      thisurl = paste0('https://biogeo.ucdavis.edu/data/climate/cmip5/30s/', fn)
+      urls_bioclim = c(urls_bioclim, thisurl)
+    }
+  }
+  test = lapply(urls_bioclim, url.exists)
+  all(unlist(test))
+  
+  ## Download files
+  zipdst = file.path(data_covs, 'gcm_30s.zip')
+  rasterdst = file.path(data_covs, 'gcm_30s/')
+  if(!dir.exists(rasterdst)) {
+    dir.create(rasterdst)
+  } # end if !dir.exists
+  for (i in 1:length(urls_bioclim)){
+    download_from_url(urls = urls_bioclim[i], zipdst, rasterdst)
+  }
+  
+  ## Extract cell-wise quartiles across GCMs
+  ...
+  
+  
+  ## -----------------------------------------------------------
 
 bio_current <- list.files(paste0(data_covs, "/bio_30s"), pattern = "bio_current*", full.names = TRUE)
 bio_rcp26 <- list.files(file.path(data_covs, "bio_30s"), pattern = "*bc26*", full.names = TRUE)
@@ -107,6 +141,8 @@ unzip(file.path(data_covs, "srtm.zip"), exdir = file.path(data_covs, "srtm"))
 file.remove(file.path(data_covs, "srtm.zip"))
   ## all files within the mn30_grd folder seem to be the same when in as raster
 srtm <- file.path(data_covs, "srtm/mn30_grd/w001000.adf")
+file.rename(srtm, sub(file_path_sans_ext(basename(srtm)), "srtm", srtm))
+srtm <- file.path(data_covs, "srtm/mn30_grd/srtm.adf")
 
     ## Alternate SRTM source: http://srtm.csi.cgiar.org/srtmdata/ (extent= -180,180,-60,60)
     # tile_names <- as.vector(unlist(as.data.frame(outer(paste0(1:72, "_"), 1:24, FUN = "paste0"))))
@@ -143,40 +179,32 @@ system("wget -r -np -nH --reject 'index.html*' -e robots=off https://daac.ornl.g
 soil <- list.files(file.path(data_covs,"orders"), pattern = "*.dat", full.names = T, recursive = T)
 
 
-## Landuse: https://earthexplorer.usgs.gov/
-## Get the ftp site for the data: https://edcftp.cr.usgs.gov/project/glcc/globdoc2_0.html
-## Go >> https://edcftp.cr.usgs.gov/project/glcc/globdoc2_0.html#anony
+## Landuse
+## Source: https://earthexplorer.usgs.gov/
+## Click 'Data Sets' tab > Land Cover > GLCC > Click 'Results >>'
+## Select one pf the global datasets and download manually through the browser
+## Save zip folder @data_covs
 ## Readme: https://www.usgs.gov/media/images/global-land-cover-characteristics-data-base-version-20
-system("wget -r -np -nH --reject 'index.html*' -e robots=off https://edcftp.cr.usgs.gov/project/glcc/globe") #corrupted...
+unzip(file.path(data_covs, "glccgbe20_tif.zip"), files = 'gbigbpgeo20.tif', exdir = data_covs)
+landuse <- file.path(data_covs,"gbigbpgeo20.tif")
+file.rename(landuse, sub(file_path_sans_ext(basename(landuse)), "landuse", landuse))
+landuse <- file.path(data_covs,"landuse.tif")
+## Hurtt dataset: http://luh.umd.edu/
+## ...
 
 
-system("curl https://edcftp.cr.usgs.gov/project/glcc/globe/gigbp1_2.img.gz -o data/gigbp1_2.img.gz") ##corrupted...
-R.utils::gunzip(file.path(data_covs, "gigbp1_2.img.gz"), destname = file.path(data_covs, "landcover.img"), remove = FALSE)
-landuse <- file.path(data_covs, "gigbp1_2.img")
-landuse_out <- file.path(".data/gigbp1_2.img")
-gdal_crop(inpath = landuse, outpath = landuse_out, extent=e, res=reso)
-
-
-unzip(file.path(data_covs, "gigbp1_2.img.gz"), exdir = file.path(data_covs, "landcover"))
-landuse <- list.files(file.path(data_covs,"landcover"), pattern = c("*igbp", "*.tif"), full.names=T)
-landuse <- landuse[3] 
-
-  ## Hurtt dataset...
-
-r <- brick("/Volumes/discovery_data/gsdms_data/gigbp1_2.img")
-
-## DATA PROCESSING
+## --------------------------------
+## Data processing
+## --------------------------------
 ## Create Mask from WorldClim layer
 global_mask <- raster(bio_current[1])
 global_mask[which(!is.na(global_mask[]))] <- 1
-writeRaster(global_mask, filename = paste0(data_gsdms, "/globalmask10m.tif"))
+writeRaster(global_mask, filename = paste0(data_covs, "/globalmask.tif"))
 
 
 ## sense::gdal_crop
 file_in <- c(bioclim, srtm, soil, landuse)
 file_out <- paste0(data_covs, "/processed/", paste0(tools::file_path_sans_ext(basename(file_in)), "_treated.", tools::file_ext(file_in)))
-file_out[58] <- sub(file_path_sans_ext(basename(file_out[58])), "srtm_treated", file_out[58]) # rename srtm
-file_out[63] <- sub(file_path_sans_ext(basename(file_out[63])), "landuse_treated", file_out[63]) #renname landuse
 
 e <- c(-180,180,-60,90)
 reso <- res(global_mask)
@@ -230,6 +258,15 @@ covariates_all <- stack(setdiff(file_out, file_out[grep("srtm|landuse", file_out
 
 rm(list=setdiff(ls(), c("data_gsdms", "covariates_all", "global_mask")))
 crs(covariates_all) <- crs(global_mask)
+covariates_all <- mask(covariates_all, global_mask)
+
+
+## Update mask based on NAs in covariate data - to get min set NAs
+source("./R/align.maskNA.R")
+
+raw_mask <- global_mask
+raw_mask[which(!is.na(raw_mask[]))] <- 1
+global_mask <- align.maskNA(covariates_all, raw_mask)
 covariates_all <- mask(covariates_all, global_mask)
 names(covariates_all) <- sub("_treated","", names(covariates_all))
 
@@ -345,3 +382,15 @@ saveRDS(covariates_predict, file = "./output/covariates_predict.rds")
 # gc()
 # pop <- raster(paste0(data_path, "processed/","population.tif"))
 
+
+
+## xxxx .. not working
+## Alternatively, .. not working
+## Get the ftp site for the data from: https://edcftp.cr.usgs.gov/project/glcc/globdoc2_0.html
+## Go >> https://edcftp.cr.usgs.gov/project/glcc/globdoc2_0.html#anony
+system("wget -r -np -nH --reject 'index.html*' -e robots=off https://edcftp.cr.usgs.gov/project/glcc/globe") #corrupted...
+system("curl https://edcftp.cr.usgs.gov/project/glcc/globe/gigbp1_2.img.gz -o data/gigbp1_2.img.gz") ##corrupted...
+R.utils::gunzip(file.path(data_covs, "gigbp1_2.img.gz"), destname = file.path(data_covs, "landcover.img"), remove = FALSE)
+landuse <- file.path(data_covs, "gigbp1_2.img")
+landuse_out <- file.path(".data/gigbp1_2.img")
+gdal_crop(inpath = landuse, outpath = landuse_out, extent=e, res=reso)

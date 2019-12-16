@@ -36,7 +36,9 @@ global_mask <- align.maskNA(covariates, raw_mask)
 covariates <- mask(covariates, global_mask)
 covariates_predict <- mask(covariates_predict, global_mask)
 
+
 ## Quadrature (background) points & associated covariate data
+## .....here use code for generated background points based on species regions
 global_mask0 <- global_mask
 global_mask0[which(is.na(global_mask0[]))] <- 0
 rpts <- rasterToPoints(global_mask0, spatial=TRUE)

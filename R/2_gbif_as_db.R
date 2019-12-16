@@ -1,4 +1,9 @@
-## ---- [UNDER DEV] to set up with Casey ---- ##
+## ---- [UNDER DEV WITH MDAP TEAM] ---- ##
+## Contibutors:
+## Casey Visitn, Usha Nattala
+
+
+
 
 ## Load libraries
 pacman::p_load(DBI, RPostgreSQL)
