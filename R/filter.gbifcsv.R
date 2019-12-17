@@ -1,5 +1,5 @@
 
-##'@title 
+##'@author Payal Bal
 ##'
 ##'@description Filters csv data downloaded from GBIF.
 ##'

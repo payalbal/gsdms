@@ -1,6 +1,5 @@
 ## ---- [UNDER DEV WITH MDAP TEAM] ---- ##
-## Contibutors:
-## Casey Visitn, Usha Nattala
+## Contibutors: Casey Visitn, Usha Nattala
 
 
 

@@ -1,7 +1,28 @@
+
+## Author: Payal Bal
+align.maskNA <- function(raster_stack, region_mask) {
+  # update mask based on NAs in covariate stack
+  
+  print(paste0("# NAs in input mask: ", summary(region_mask)[6]))
+  
+  for (i in names(raster_stack)){
+    if (!sum(is.na(region_mask@data@values)) == sum(is.na(raster_stack[[i]]@data@values))) {
+      nona <- which(!is.na(values(region_mask))) # non-na values in mas
+      nas <- which(is.na(values(raster_stack[[i]])[nona])) # na values in covariate
+      xys <- xyFromCell(region_mask, nona)
+      xys <- xys[nas,]
+      values(region_mask)[cellFromXY(region_mask, xys)] <- NA
+    }
+  }
+  
+  new_mask <- region_mask
+  
+  print(paste0("# NAs in output mask: ", summary(new_mask)[6]))
+  return(new_mask)
+}
+
+
 ## Author: Nick Goulding
-## Notes: Not suitable for 
-
-
 nearestLand <- function (points, raster, max_distance) {
   # get nearest non_na cells (within a maximum distance) to a set of points
   # points can be anything extract accepts as the y argument
@@ -49,18 +70,27 @@ nearestLand <- function (points, raster, max_distance) {
   
   return (t(sapply(neighbour_list, nearest, raster)))
 }
+
+
+## Author: Payal Bal
+catch_errors <- function(i, ppm_models, species_names, errorfile) {
+  # catch errors in model outputs
+  # -> list of outputs for models without errors, 
+  # -> list of outputs for models with errors, 
+  # -> text file with list of models with errors (species indices and species names)
   
-  
-  
-  ## OTHER
-  ## ----------------------------------------------------------------------
-  notMissingIdx <- function(raster) {
-    # return an index for the non-missing cells in raster
-    which(!is.na(getValues(raster)))
+  cat('Checking model for ', species_names[i],'for errors\n')
+  for(i in 1:length(ppm_models)){
+    if(!class(ppm_models[[i]])[1] == "try-error") {
+      model_list[[n]] <- ppm_models[[i]]
+      n <- n+1
+    }else{
+      print(paste0("Model ",i, " for '", spp[i], "' has errors"))
+      cat(paste(i, ",", spp[i], "\n"),
+          file = errorfile, append = T)
+      error_list[[m]] <- ppm_models[[i]]
+      m <- m+1
+    }
   }
-  
-  missingIdx <- function(raster) {
-    # return an index for the missing cells in raster
-    which(is.na(getValues(raster)))
-  }
-  
+}
+

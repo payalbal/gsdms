@@ -1,69 +1,76 @@
-#'@title PPM models fitted for GBIF occurrence data
-#'
-#'@authors: Payal Bal, Skipton Wooley
-#'
-#'@description Fit PPMs using GBIF data for IUCN listed species
-#'GitHub: https://github.com/payalbal/gsdms/blob/master/R/6_ppms.R
 
 
+## Set up work environment ####
+rm(list = ls())
+gc()
+# system("ps")
+# system("pkill -f R")
 
-## SET UP WORKSPACE
-pacman::p_load(sp, raster, spatstat.data, nlme, rpart, spatstat, ppmlasso, 
-               parallel, doParallel, doMC)
-# mc.cores <- 30 ## for boab
-mc.cores <- 1
+setwd("./ppm_example/")
 
-## Create 'output' folder
+x <- c('sp', 'raster', 'spatstat.data', 'nlme', 'rpart', 'spatstat', 'ppmlasso', 
+       'parallel', 'doParallel', 'doMC')
+lapply(x, require, character.only = TRUE)
+
+data_path <- "./data/" # "/Volumes/discovery_data/ppm_example_data/"
+output_path <- "./ouput/" 
 if(!dir.exists("./output")) {
   dir.create("./output")
 }
 
+source("./R/0_functions.R")
 
 
-## DATA
-## Load covariate data
-covariates <- readRDS("./output/covariates.rds")
-covariates_predict <- readRDS("./output/covariates_predict.rds")
-raw_mask <- raster("./data/bio1.bil") 
+## Load data ####
+## Covariate data
+cov_mod <- readRDS(file.path(data_path, "covs_model.rds"))
+cov_pred <- readRDS(file.path(data_path,"covs_predict.rds"))
+# covariates <- readRDS("./output/covariates.rds")
+# covariates_predict <- readRDS("./output/covariates_predict.rds")
+# raw_mask <- raster("./data/bio1.bil") 
 
-## Load species data
-gbif <- read.csv("./data/2019-05-14_gbif_iucnsp.csv", header = TRUE)
+## Biodiversity data
+##  see README.md for data cleaning notes
+occdat <- readRDS(file.path(data_path, "occ_vn.rds"))
+# gbif <- read.csv("./data/2019-05-14_gbif_iucnsp.csv", header = TRUE)
 
-## Update mask based on NAs in covariate data
-raw_mask[which(!is.na(raw_mask[]))] <- 1
-source("./R/align.maskNA.R")
-global_mask <- align.maskNA(covariates, raw_mask)
-covariates <- mask(covariates, global_mask)
-covariates_predict <- mask(covariates_predict, global_mask)
+## Mask
+reg_mask <- readRDS(file.path(data_path, "mask_vn.rds"))
+
+## Find min non-NA set values across mask and covariates and sync NAs
+##  see 0_functions.R
+reg_mask <- align.maskNA(cov_mod, reg_mask)
+reg_mask <- align.maskNA(cov_pred, reg_mask)
+cov_mod <- mask(cov_mod, reg_mask)
+cov_pred <- mask(cov_pred, reg_mask)
 
 
-## Quadrature (background) points & associated covariate data
-## .....here use code for generated background points based on species regions
-global_mask0 <- global_mask
-global_mask0[which(is.na(global_mask0[]))] <- 0
-rpts <- rasterToPoints(global_mask0, spatial=TRUE)
+## Quadrature (background) points
+reg_mask0 <- reg_mask
+reg_mask0[which(is.na(reg_mask0[]))] <- 0
+rpts <- rasterToPoints(reg_mask0, spatial=TRUE)
 backxyz <- data.frame(rpts@data, X=coordinates(rpts)[,1], Y=coordinates(rpts)[,2])     
 backxyz <- backxyz[,-1]
-backxyz <- na.omit(cbind(backxyz, as.matrix(covariates)))
+backxyz <- na.omit(cbind(backxyz, as.matrix(cov_mod)))
 backxyz200k <- backxyz[sample(nrow(backxyz), 200000), ]
 backxyz200k$Pres <- rep(0, dim(backxyz200k)[1])
 
-# ## Checks
-# summary(covariates)
-# summary(backxyz200k)
-# plot(global_mask0, legend = FALSE)
-# plot(rasterFromXYZ(backxyz200k[,1:3]), col = "black", add = TRUE, legend=FALSE)
+## Checks
+summary(cov_mod)
+summary(backxyz200k)
+plot(reg_mask0, legend = FALSE)
+plot(rasterFromXYZ(backxyz200k[,1:3]), col = "black", add = TRUE, legend=FALSE)
 
-## Prediction points 
+
+## Prediction points ####
 predxyz <- data.frame(rpts@data, X=coordinates(rpts)[,1], Y=coordinates(rpts)[,2])     
 predxyz <- predxyz[,-1]
-predxyz <- na.omit(cbind(predxyz, as.matrix(covariates_predict)))
+predxyz <- na.omit(cbind(predxyz, as.matrix(cov_pred)))
 
 
-
-## MODEL PARAMETERS
+## Define model parameters ####
 ## Define global ppm variables
-ppm_terms <- names(backxyz200k)[1:(length(names(backxyz200k))-1)]
+ppm_terms <- names(backxyz200k) [1:(length(names(backxyz200k))-1)]
 
 ## Specify covariates with interactions
 interaction_terms <- c("X", "Y")
@@ -74,13 +81,13 @@ lambdaseq <- round(sort(exp(seq(-10, log(100 + 1e-05), length.out = 20)),
 
 ## Estimate weights for background points
 ## calculate the area of the globe and then work out the weights based on the total area divided by number of points
-ar <- raster::area(global_mask0)
-ar <- mask(ar,global_mask)
+ar <- raster::area(reg_mask0)
+ar <- mask(ar,reg_mask)
 totarea <- cellStats(ar,'sum')*1000 ## in meters^2
 area_offset <- extract(ar, backxyz200k[,c('X','Y')], small = TRUE, fun = mean, na.rm = TRUE)*1000 ## in meters
 bkgrd_wts <- c(totarea/area_offset)
 
-## Estimate species weights - but it's not quite right
+## Estimate species weights - not quite right yet - SW
 # spdat <- gbif
 # species_names <- levels(factor(spdat$species))
 # spwts <- list()
@@ -97,9 +104,7 @@ bkgrd_wts <- c(totarea/area_offset)
 # }
 
 
-
-## SPECIFY MODEL
-## Function: PPM model        
+## Define model function ####
 fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms, species_names, n.fits=50, min.obs = 50) {
   
   ## Initialise log file
@@ -108,46 +113,43 @@ fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms,
   writeLines(c(""), logfile)
   
   ## Definne species specific data & remove NA (if any)
-  spxy <- spdat[spdat$species %in% species_names[i], c(4,3)]
+  spxy <- spdat[spdat$species %in% species_names[i], c(1,2)]
   names(spxy) <- c("X", "Y")
   
-  ## see points
-  # plot(global_mask, ext = extent(xmin, xmax, ymin, ymax))
-  # points(spxy)  
+  # ## Check if points fall outside the mask
+  plot(reg_mask)
+  points(spxy)
   
-  ## Move species occurrence points fallong off the mask to nearest 'land' cells
-  # find points which fall in NA areas on the raster
-  vals <- extract(global_mask, spxy)
+  ## Move species occurrence points falling off the mask to nearest 'land' cells
+  ## find points which fall in NA areas on the raster
+  vals <- extract(reg_mask, spxy)
   outside_mask <- is.na(vals)
-  outside_pts <- spxy[outside_mask, ]
-  # find the nearest land within 5 decimal degrees of these
-  land <- nearestLand(outside_pts, global_mask, 1000000)
-  # count how many were moved
-  sum(!is.na(land[, 1]))
-  # and how many were too far out
-  sum(is.na(land[, 1]))
-  # replace points falling in NA with new points on nearest land
-  spxy[outside_mask, ] <- land
-  ## PROBLEM: We lose data again i.e. number of unique locations is reduced. This can be problematic for ppms...
-  nrow(unique(outside_pts))
-  nrow(unique(land))
+  if(sum(outside_mask) > 0){
+    outside_pts <- spxy[outside_mask, ]
+    ## find the nearest land within 5 decimal degrees of these
+    land <- nearestLand(outside_pts, reg_mask, 1000000)
+    ## replace points falling in NA with new points on nearest land
+    spxy[outside_mask, ] <- land
+    ## count how many were moved
+    sum(!is.na(land[, 1]))
+  }
+  # ## PROBLEM: We lose data again i.e. number of unique locations is reduced. This can be problematic for ppms...
+  # nrow(unique(outside_pts))
+  # nrow(unique(land))
   
   
   ## Extract covariates for presence points
-  
-  
-  
-  ## For landuse: Take the raster value with lowest distance to point AND non-NA value in the raster
-  ## ---- takes very logn to run; fidn alternative ----
-  r = covariates[[1]] ## landuse raster
+  ## For landuse: Take the non-NA value at shortest distance from point
+  ## -- takes very logn to run; find alternative
+  r = cov_mod[[1]] ## landuse raster
   spxy_landuse <- apply(X = spxy, MARGIN = 1, FUN = function(X) r@data@values[which.min(replace(distanceFromPoints(r, X), is.na(r), NA))])
   ## spxy_landuse <- extract(r, spxy, method='simple', na.rm=TRUE, factor = TRUE) still gives NAs...
   # ## Check: Compare if non-NA values match with extract()
-  # spxy_landuse_extract <- extract(covariates[[1]], spxy, method = 'simple') ## gives NAs
+  # spxy_landuse_extract <- extract(cov_mod[[1]], spxy, method = 'simple') ## gives NAs
   # spxy_landuse_extract[which(!is.na(spxy_landuse_extract))] == spxy_landuse[which(!is.na(spxy_landuse_extract))]
   
   ## For other covariates: extract() using buffer
-  spxyz <- extract(covariates[[-1]], spxy, buffer = 1000000, small = TRUE, 
+  spxyz <- extract(cov_mod[[-1]], spxy, buffer = 1000000, small = TRUE, 
                    fun = mean, na.rm = TRUE)
   
   spxyz <- cbind(spxy, spxy_landuse, spxyz)
@@ -157,7 +159,7 @@ fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms,
   ## Specify model based on number of observatios
   ## If number of observations < 20, do not fit a model.
   ## If number of observations >= 20, fit a model accordig to the followig rule:
-  ##  1. If number of observations <= min.obs (deafult as 50), 
+  ##  1. If number of observations <= min.obs (default as 50), 
   ##    use only the spatial covariates i.e. lat and long. This gives 5 
   ##    terms: X, Y, X^2, Y^2, X:Y (linear, quadratic with interaction)
   ##  2. .... 50 - 90
@@ -171,6 +173,7 @@ fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms,
   ##    There are 12 covariates in all includign lat and log. 
   
   nk <- nrow(spxyz)
+  min.obs <- 50
   if (!(nk < 20)) {
     
     ## Add presence column to species occurrence table
@@ -227,10 +230,11 @@ fit_ppms_apply <- function(i, spdat, bkdat, bkwts, interaction_terms, ppm_terms,
 }
 
 ## Fit models
-spdat <- gbif
+spdat <- as.data.frame(occdat)
 bkdat <- backxyz200k
 bkwts <- bkgrd_wts
-spp <- levels(factor(spdat$species))
+spp <- levels(factor(spdat$species))[1:2]
+mc.cores <- 1
 seq_along(spp)
 ppm_models <- parallel::mclapply(1:length(spp), fit_ppms_apply, spdat, #spwts,
                                  bkdat, bkwts, interaction_terms, ppm_terms, 
@@ -261,8 +265,7 @@ saveRDS(error_list, file = paste0("./output/errlist_",  gsub("-", "", Sys.Date()
 
 
 
-## PREDICTION
-## Function: PPM predictions
+## Prediction function ####
 predict_ppms_apply <- function(i, models_list, newdata, bkdat, RCPs = c(26, 85)){
   
   cat('Predicting ', i,'^th model\n')
@@ -310,7 +313,7 @@ saveRDS(prediction_list, file = paste0("./output/predlist_",  gsub("-", "", Sys.
 
 
 
-## LOCATE ERRORS AND RERUN ANALYSIS FOR SPECIES WITH ERROR
+## Locate errors and rerun analysis for species with errors ###
 ##  To be automated if error problem is not solved by species grouping
 ##  At the moment, it appears that error might be when species data is spatially restricted.
 error_species <- read.table("./output/errorfile_1_20190725.txt", header = FALSE, sep = ",")
@@ -364,37 +367,18 @@ for (i in 1:length(error_pred)) {
 names(prediction_list)[((length(prediction_list)-length(error_pred))+1):length(prediction_list)] <- names(error_pred)
 
 
-
-
-
-
-## -----------------------------------------------------------------------------
-## EXTRAS
-## -----------------------------------------------------------------------------
-
-## FUNCTION: Catch errors in model outputs
-##  (1) List of outputs for models without errors, 
-##  (2) list of outputs for models with errors, 
-##  (3) text file with list of models with errors (species indices and species names) 
-catch_errors <- function(i, ppm_models, species_names, errorfile) {
-  cat('Checking model for ', species_names[i],'for errors\n')
-  for(i in 1:length(ppm_models)){
-    if(!class(ppm_models[[i]])[1] == "try-error") {
-      model_list[[n]] <- ppm_models[[i]]
-      n <- n+1
-    }else{
-      print(paste0("Model ",i, " for '", spp[i], "' has errors"))
-      cat(paste(i, ",", spp[i], "\n"),
-          file = errorfile, append = T)
-      error_list[[m]] <- ppm_models[[i]]
-      m <- m+1
-    }
-  }
-}
+## Catch remianing errors ####
+n <- 1
+m <- 1
 catch_errors(seq_along(error_models), ppm_models = model_list, species_names = spp, errorfile = errorfile)
 
 
-## TESTING FOR CORRELATED VARIABLES
+
+
+
+## ------ EXTRAS ----------------
+
+## Testing for corerelations in vcovariates ####
 ## There is no hard and fast rule about how many covariates to fit to data, and it will change depending on the data and the amount of information in each observation and how they vary with the covariates, how the covariates are correlated ect... But to start I'd only fit sqrt(n_observations) covariates. So if you have 20 occurrences that's 4-5 covariates (including the polynomials) so that's only two variables! You might have to identify the most important variable and start from there.
 
 ## see slide 14 & 26 in: http://www.bo.astro.it/~school/school09/Presentations/Bertinoro09_Jasper_Wall_3.pdf
@@ -452,9 +436,10 @@ if(nk <= 5){ ## because linear and quad for X ad Y gives 5 terms
 n.obs <- seq(20,1000, 10)
 cutoff <- ceiling(sqrt(n.obs))
 add.params <- ceiling((sqrt(n.obs) - 5)/2)
-max.params <- length(names(covariates))
+max.params <- length(names(cov_mod))
 obs.cutoff <- n.obs[which(add.params > max.params)[1]]
 add.params[which(add.params > max.params)] <- max.params
 plot(n.obs,add.params, type ="l")
 abline(v=obs.cutoff)
 text(obs.cutoff - 20, 4, paste0("max obs for params cut off: ", obs.cutoff), srt=90)
+

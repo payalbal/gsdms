@@ -1,5 +1,5 @@
-## ---- [UNDER DEV WITH MDAP TEAM] ---- ##
-## Contibutors:
+## ---- [UNDER DEV] ---- ##
+## Contibutors: Casey Visintin, Usha Nattala
 ## 
 ## Add script: gbif_newdb_for_gsdms.R
 
