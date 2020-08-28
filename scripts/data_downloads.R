@@ -2,7 +2,7 @@
 
 
 ## Set working environment ---- ####
-data_covs <- "../data" # set path to data folder server
+data_covs <- "../data" # set path to data folder server: "/tempdata/workdir/data"
 setwd(data_covs)
 library(bitops)
 library(RCurl)
@@ -255,8 +255,8 @@ system("wget -r -np -nH --reject 'index.html*' -e robots=off https://daac.ornl.g
 ##  OR...[check if this works, if so use this instead of the above]
 system("wget -r -np -nH --reject 'index.html*' -e robots=off https://daac.ornl.gov/orders/ca2c9c7d67f425992259251a578b8669/ -O data/soil.zip")
 temp <- unzip("data/soil.zip", list = TRUE)
-unzip("data/soil.zip", exdir = "./data")
-file.rename(paste0("./data/", temp$Name), sub(file_path_sans_ext(basename(temp$Name)),"soil", paste0("./data/", temp$Name)))
+unzip("data/soil.zip", exdir = "/tempdata/workdir/data")
+file.rename(paste0("/tempdata/workdir/data/", temp$Name), sub(file_path_sans_ext(basename(temp$Name)),"soil", paste0("/tempdata/workdir/data/", temp$Name)))
 file.remove("data/soil.zip")
 
 ## Landuse ----- reclassify, resample, download by tile and stich tiles ####
@@ -312,7 +312,7 @@ gdal_translate(src_dataset = "/tempdata/workdir/troubleshooting/outputs/lu_world
   # ## bias??
   # # https://zenodo.org/record/3243509/files/ProbaV_LC100_epoch2015_global_v2.0.2_DataDensityIndicator_EPSG-4326.tif
   # 
-  # system("wget https://zenodo.org/record/3243509/files/ProbaV_LC100_epoch2015_global_v2.0.2_discrete-classification_EPSG-4326.tif -O ./data/raw/discrete-classification_EPSG4326.tif")
+  # system("wget https://zenodo.org/record/3243509/files/ProbaV_LC100_epoch2015_global_v2.0.2_discrete-classification_EPSG-4326.tif -O /tempdata/workdir/data/raw/discrete-classification_EPSG4326.tif")
 
 
   # ## Alternative Source (discrete data): https://earthexplorer.usgs.gov/
@@ -339,15 +339,15 @@ gdal_translate(src_dataset = "/tempdata/workdir/troubleshooting/outputs/lu_world
 ## Global geodatabase: https://sedac.ciesin.columbia.edu/downloads/data/groads/groads-global-roads-open-access-v1/groads-v1-global-gdb.zip
 ## Unable to find direct download link
 ...system("wget -r -np -nH --reject 'index.html*' -e robots=off https://sedac.ciesin.columbia.edu/downloads/data/groads/groads-global-roads-open-access-v1/groads-v1-global-gdb.zip -O data/groads.zip")
-dir.create("./data/groads")
-unzip("data/groads.zip", exdir = "./data/groads")
+dir.create("/tempdata/workdir/data/groads")
+unzip("data/groads.zip", exdir = "/tempdata/workdir/data/groads")
 
 ## Oceania East: https://sedac.ciesin.columbia.edu/downloads/data/groads/groads-global-roads-open-access-v1/groads-v1-oceania-east-shp.zip
 ## Notes: https://stackoverflow.com/questions/1324421/how-to-get-past-the-login-page-with-wget
 ## Unable to find direct download link
 ...system("wget -r -np -nH --reject 'index.html*' -e robots=off https://sedac.ciesin.columbia.edu/downloads/data/groads/groads-global-roads-open-access-v1/groads-v1-oceania-east-shp.zip -O data/roads_oceaniaeast.zip")
-dir.create("./data/roads_oceaniaeast")
-unzip("data/roads_oceaniaeast.zip", exdir = "./data/roads_oceaniaeast")
+dir.create("/tempdata/workdir/data/roads_oceaniaeast")
+unzip("data/roads_oceaniaeast.zip", exdir = "/tempdata/workdir/data/roads_oceaniaeast")
 
   ## Alternate source: https://www.globio.info/download-grip-dataset
 
@@ -355,15 +355,17 @@ unzip("data/roads_oceaniaeast.zip", exdir = "./data/roads_oceaniaeast")
 ## Lakes & rivers ---- ####
 ## Source: http://www.soest.hawaii.edu/wessel/gshhg/
 system("wget -r -np -nH --reject 'index.html*' -e robots=off http://www.soest.hawaii.edu/pwessel/gshhg/gshhg-shp-2.3.7.zip -O data/lakesrivers.zip")
-dir.create("./data/lakesrivers")
-unzip("data/lakesrivers.zip", exdir = "./data/lakesrivers")
+dir.create("/tempdata/workdir/data/lakesrivers")
+unzip("data/lakesrivers.zip", exdir = "/tempdata/workdir/data/lakesrivers")
 
 
 ## Built-up areas ---- ####
 ## Source: https://ghsl.jrc.ec.europa.eu/download.php?ds=bu
-system("wget -r -np -nH --reject 'index.html*' -e robots=off https://cidportal.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_BUILT_LDSMT_GLOBE_R2018A/GHS_BUILT_LDS2014_GLOBE_R2018A_54009_250/V2-0/GHS_BUILT_LDS2014_GLOBE_R2018A_54009_250_V2_0.zip -O data/builtup.zip")
-dir.create("./data/builtup")
-unzip("data/builtup.zip", exdir = "./data/builtup")
+## Selct options on LHS: resolution, projection 
+## Right click on global download link & paste below
+system("wget -r -np -nH --reject 'index.html*' -e robots=off https://cidportal.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_BUILT_LDSMT_GLOBE_R2018A/GHS_BUILT_LDS2014_GLOBE_R2018A_54009_1K/V2-0/GHS_BUILT_LDS2014_GLOBE_R2018A_54009_1K_V2_0.zip -O data/builtup.zip")
+dir.create("/tempdata/workdir/data/builtup")
+unzip("data/builtup.zip", exdir = "/tempdata/workdir/data/builtup")
 
   ## Alternatre source: https://sedac.ciesin.columbia.edu/data/set/ulandsat-hbase-v1
   ## Unable to find direct download link
@@ -371,10 +373,20 @@ unzip("data/builtup.zip", exdir = "./data/builtup")
 
 ## Protected areas ---- #### 
 ## Source: https://www.protectedplanet.net/
-system("wget -r -np -nH --reject 'index.html*' -e robots=off http://wcmc.io/wdpa_current_release -O data/protectedareas.zip")
-dir.create("./data/protectedareas")
-unzip("data/protectedareas.zip", exdir = "./data/protectedareas")
-
+## Protected areas ---- #### 
+## Source: https://www.protectedplanet.net/
+## Protected areas ---- #### 
+## Source: https://www.protectedplanet.net/
+system("wget -r -np -nH --reject 'index.html*' -e robots=off https://www.protectedplanet.net/downloads/WDPA_Aug2020?type=shapefile -O /tempdata/workdir/data/protectedareas.zip")
+dir.create("/tempdata/workdir/data/protectedareas")
+pafiles <- unzip("/tempdata/workdir/data/protectedareas.zip", list = TRUE)[c(1:3),]
+unzip("/tempdata/workdir/data/protectedareas.zip", files = pafiles$Name, exdir = "/tempdata/workdir/data/protectedareas")
+  ## corrupted zip file but the 3 split zip files are unzipped
+  ## manual download to get the complete folder
+pafiles <- list.files("/tempdata/workdir/data/protectedareas", pattern = "WDPA_Aug2020-shapefile", full.names = TRUE)
+for (i in 1:length(pafiles)) {
+  unzip(pafiles[i], exdir = paste0("/tempdata/workdir/data/protectedareas/", basename(tools::file_path_sans_ext(pafiles[i]))))
+}
 
 ## Population ---- ####
 ## Source (requires login): https://sedac.ciesin.columbia.edu/data/set/gpw-v4-population-density-rev11
@@ -382,8 +394,8 @@ unzip("data/protectedareas.zip", exdir = "./data/protectedareas")
 ## Click 'Create Download' and copy download links
 ## Unable to find direct download link
 ...system("wget -r -np -nH --reject 'index.html*' -e robots=off https://sedac.ciesin.columbia.edu/downloads/data/gpw-v4/gpw-v4-population-density-rev11/gpw-v4-population-density-rev11_2000_30_sec_tif.zip -O data/population.zip")
-dir.create("./data/population")
-unzip("data/population.zip", exdir = "./data/population")
+dir.create("/tempdata/workdir/data/population")
+unzip("data/population.zip", exdir = "/tempdata/workdir/data/population")
 
 
 
