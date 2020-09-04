@@ -373,10 +373,6 @@ unzip("data/builtup.zip", exdir = "/tempdata/workdir/data/builtup")
 
 ## Protected areas ---- #### 
 ## Source: https://www.protectedplanet.net/
-## Protected areas ---- #### 
-## Source: https://www.protectedplanet.net/
-## Protected areas ---- #### 
-## Source: https://www.protectedplanet.net/
 system("wget -r -np -nH --reject 'index.html*' -e robots=off https://www.protectedplanet.net/downloads/WDPA_Aug2020?type=shapefile -O /tempdata/workdir/data/protectedareas.zip")
 dir.create("/tempdata/workdir/data/protectedareas")
 pafiles <- unzip("/tempdata/workdir/data/protectedareas.zip", list = TRUE)[c(1:3),]
