@@ -1,7 +1,0 @@
-Clean cached files
-http://blog.jonathanchannon.com/2012/11/18/gitignore-not-working-fixed/
-
-
-git rm -r --cached .
-git add .
-git commit -m ".gitignore is now working"
