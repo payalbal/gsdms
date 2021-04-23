@@ -1,12 +1,11 @@
 # Specific files/folders #
 ##########################
-R/trialscripts/
+scripts/trialscripts/
 output/
-R/connect_to_server.R
+scripts/connect_to_server.R
 figs/
 data/
-R/0_gsdms.Rmd
-
+scripts/0_gsdms.Rmd
 
 # R files #
 ###########

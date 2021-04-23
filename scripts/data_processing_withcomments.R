@@ -135,6 +135,22 @@ srtm <- file.path(data_path, "srtm/mn30_grd/srtm.adf")
 soil <- list.files(file.path(data_path,"orders"), pattern = "*.dat", full.names = T, recursive = T)
 
 ## Landuse ####
+## Source: Copernicus data (for fraclu analysis)
+## Link @ GEE: https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V_Global
+## Direct download link: https://zenodo.org/communities/copernicus-land-cover/search?page=1&size=20
+## Data processing for global layer @ GEE by MC Loor: https://code.earthengine.google.com/?scriptPath=users%2Fpayalbal%2Fglobal_layers%3Afraclu_mcloor_sklu. See processing in GEE for reclassification scheme.
+
+## Land use classes used:
+## 1    urban
+## 2    crop
+## 3    forest
+## 4    grass
+## 5    other
+## 6    NA
+
+# ... gee.py script
+# ...download by title
+
 ## Stiching tiles by Maria del Mar Quiroga
 ## ref: https://stackoverflow.com/a/50235578
 
@@ -180,7 +196,7 @@ reso_wgs <- res(raster(file.path(data_path, "global_mask_crop.tif")))
 e <- c(-180,180,-60,90)
 mapply(gdalCrop, inpath = infile, outpath = outfile, MoreArgs = list(extent=e, resolution=reso_wgs, return = FALSE)) 
 
-## step two_reproject
+## step two_reproject: Equal Earth
 infile <- outfile #list.files(data_processed, pattern = "_cropped", full.names = TRUE)
 outfile <- sub("_cropped", "_aligned", infile)
 reso_ee <- c(1000,1000)

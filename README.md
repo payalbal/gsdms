@@ -24,8 +24,9 @@ LATER: not quite right yet
 
 4.Move species occurrence points falling off the mask to nearest 'land' cells
 We lose data again i.e. number of unique locations is reduced. This can be problematic for ppms...
-  # nrow(unique(outside_pts))
-  # nrow(unique(land))
+
+nrow(unique(outside_pts))
+nrow(unique(land))
   
   
 5. Extract covariates for presence points
