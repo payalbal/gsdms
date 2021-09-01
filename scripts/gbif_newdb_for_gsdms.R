@@ -5,7 +5,7 @@ pacman::p_load(DBI, RPostgreSQL, data.table, rgbif, foreach,
                iterators, parallel, doParallel, doMC) 
 
 ## Connect to server (named 'con' later in the code)
-source("./R/connect_to_server.R")
+source("./scripts/connect_to_server.R")
 
 
 ## Get species counts

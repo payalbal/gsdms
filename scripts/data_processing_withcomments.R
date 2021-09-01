@@ -1,15 +1,17 @@
 ## Data processing for global analyses
 ## NOTE: Data sources recorded in data_downnloads.R
+setwd("./land-use")
 
 
 ## Set working environment ####
-setwd("./land-use")
-
 # devtools::install_github('skiptoniam/sense')
-x <- c('sp', 'raster', 'rgdal', 'sense', 'tools', 'bitops', 'RCurl', 'gdalUtils', 'usethis')
+x <- c('data.table', 'sp', 'raster', 
+       'rgdal', 'sense', 'tools', 'bitops', 
+       'RCurl', 'gdalUtils', 'usethis')
 lapply(x, require, character.only = TRUE)
 source("./0_functions_par.R")
 source("./gdal_calc.R") # by jgarber
+
 # ## How to pull directly from jgarber's repo:
 # library(RCurl)
 # url <- "https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R"
@@ -19,14 +21,18 @@ source("./gdal_calc.R") # by jgarber
 # url <- "https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons.git"
 # devtools::install_git(url = url)
 
-data_path <- "/tempdata/workdir/data" ## "/Volumes/discovery_data/gsdms_data"
-data_processed <- file.path(getwd(), "processed_layers") 
-dir.create(data_processed)
+## File paths and folders
+data_dir = "~/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data"
+processed_dir = file.path(data_dir, "outputs")
+dir.create(processed_dir)
+
+
+
 
 
 ## WorldClim (current) data ####
 ## Source: https://www.worldclim.org/version1
-bio_current <- list.files(paste0(data_path, "/bio_30s"), pattern = "bio_current*", full.names = TRUE)
+bio_current <- list.files(paste0(data_dir, "/bio_30s"), pattern = "bio_current*", full.names = TRUE)
 
 ## Create mask ####
 ## step one_create mask from WorldClim layer 
@@ -35,12 +41,12 @@ global_mask <- raster(bio_current[1])
 global_mask[which(!is.na(global_mask[]))] <- 1
 wgs_crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" 
 crs(global_mask) <- wgs_crs
-writeRaster(global_mask, filename = file.path(data_path, "global_mask.tif"))
+writeRaster(global_mask, filename = file.path(data_dir, "global_mask.tif"))
 plot(global_mask)
 
 ## step two_clip mask to desired extent
-infile <- file.path(data_path, "global_mask.tif")
-outfile <- file.path(data_path, "global_mask_crop2.tif")
+infile <- file.path(data_dir, "global_mask.tif")
+outfile <- file.path(data_dir, "global_mask_crop2.tif")
 reso_wgs <- res(global_mask)
 e <- c(-180,180,-60,90)
 sense::gdalCrop(inpath = infile, outpath = outfile, extent=e, resolution=reso_wgs, return = FALSE)
@@ -58,9 +64,9 @@ gdalwarp(outfile, outfile2, s_srs = wgs_crs, t_srs = new_crs, tr = reso_ee) #, o
 
 ## GCM data ####
 ## One GCM: BCC-CSM1-1
-bio_rcp45 <- list.files(file.path(data_path, "gcm_30s"), pattern = "*bc45*", full.names = TRUE)
-bio_rcp60 <- list.files(file.path(data_path, "gcm_30s"), pattern = "*bc60*", full.names = TRUE)
-bio_rcp85 <- list.files(file.path(data_path, "gcm_30s"), pattern = "*bc85*", full.names = TRUE)
+bio_rcp45 <- list.files(file.path(data_dir, "gcm_30s"), pattern = "*bc45*", full.names = TRUE)
+bio_rcp60 <- list.files(file.path(data_dir, "gcm_30s"), pattern = "*bc60*", full.names = TRUE)
+bio_rcp85 <- list.files(file.path(data_dir, "gcm_30s"), pattern = "*bc85*", full.names = TRUE)
 
 ## GCM data quartiles ####
 # ## ALL GCMs
@@ -69,9 +75,9 @@ bio_rcp85 <- list.files(file.path(data_path, "gcm_30s"), pattern = "*bc85*", ful
 # rcps <- c("45", "60", "85")
 # models <- c("BC", "CC", "GS", "HD", "HE", "IP", "MI", "MR", "MC", "MG", "NO")
 # 
-# mask_file <- file.path(data_path, "global_mask_ee.tif")
-# gcm_files <- list.files(file.path(data_path, 'gcm_30s'), full.names = T, recursive = T)
-# gcm_masked_path <- file.path(data_processed, 'gcm_masked')
+# mask_file <- file.path(data_dir, "global_mask_ee.tif")
+# gcm_files <- list.files(file.path(data_dir, 'gcm_30s'), full.names = T, recursive = T)
+# gcm_masked_path <- file.path(processed_dir, 'gcm_masked')
 # if(!dir.exists(gcm_masked_path)){dir.create(gcm_masked_path)}
 # 
 # 
@@ -95,7 +101,7 @@ bio_rcp85 <- list.files(file.path(data_path, "gcm_30s"), pattern = "*bc85*", ful
 # ## Extract cell-wise quartiles across GCM
 # quartiles <- c("q1", "q2", "q3")
 # gcm_files <- list.files(gcm_masked_path, full.names = T)
-# gcm_quant_path <- file.path(data_processed, 'gcm_quant')
+# gcm_quant_path <- file.path(processed_dir, 'gcm_quant')
 # if(!dir.exists(gcm_quant_path)){dir.create(gcm_quant_path)}
 # 
 # inds <- which(!is.na(global_mask[]))
@@ -129,10 +135,10 @@ bio_rcp85 <- list.files(file.path(data_path, "gcm_30s"), pattern = "*bc85*", ful
 
 
 ## SRTM ####
-srtm <- file.path(data_path, "srtm/mn30_grd/srtm.adf")
+srtm <- file.path(data_dir, "srtm/mn30_grd/srtm.adf")
 
 ## Soil
-soil <- list.files(file.path(data_path,"orders"), pattern = "*.dat", full.names = T, recursive = T)
+soil <- list.files(file.path(data_dir,"orders"), pattern = "*.dat", full.names = T, recursive = T)
 
 ## Landuse ####
 ## Source: Copernicus data (for fraclu analysis)
@@ -155,33 +161,33 @@ soil <- list.files(file.path(data_path,"orders"), pattern = "*.dat", full.names 
 ## ref: https://stackoverflow.com/a/50235578
 
 ## step one_Get a list of all tif tiles downloaded from Google Earth Engine
-tile_files <- list.files(path = file.path(data_path, "copernicus/tifs/"), pattern = "*.tif", full.names = TRUE)
+tile_files <- list.files(path = file.path(data_dir, "copernicus/tifs/"), pattern = "*.tif", full.names = TRUE)
 
 ## step two_Build a virtual raster file stitching all tiles
 ## WARNING: This will fail if the file it is trying to write to (output.vrt) already exists
-gdalbuildvrt(gdalfile = tile_files, output.vrt = file.path(data_path, "copernicus","lu_world.vrt"))
+gdalbuildvrt(gdalfile = tile_files, output.vrt = file.path(data_dir, "copernicus","lu_world.vrt"))
 
 ## step three_Copy the virtual raster to an actual physical file
 ## WARNING: This takes ~5 minutes to run
-gdal_translate(src_dataset = file.path(data_path, "copernicus", "lu_world.vrt"), 
-               dst_dataset = file.path(data_path, "copernicus", "lu_world.tif"), 
+gdal_translate(src_dataset = file.path(data_dir, "copernicus", "lu_world.vrt"), 
+               dst_dataset = file.path(data_dir, "copernicus", "lu_world.tif"), 
                output_Raster = FALSE,
                options = c("BIGTIFF=YES", "COMPRESSION=LZW"))
 
 ## step four_Save each band (i.e. land use class) as a tif file
-landuse <- file.path(file.path(data_path, "copernicus", "lu_world.tif"))
+landuse <- file.path(file.path(data_dir, "copernicus", "lu_world.tif"))
 landuse <- brick(landuse)
 for (i in 1:nlayers(landuse)){
   temp <- landuse[[i]]
-  writeRaster(temp, filename = file.path(data_path, "copernicus", paste0("landuse_class", i, ".tif")))
+  writeRaster(temp, filename = file.path(data_dir, "copernicus", paste0("landuse_class", i, ".tif")))
 }
 rm(temp, landuse)
 ## landuse classes: urban, crop, forest, grass, other
-lu1 <- file.path(file.path(data_path, "copernicus", "landuse_class1.tif"))
-lu2 <- file.path(file.path(data_path, "copernicus", "landuse_class2.tif"))
-lu3 <- file.path(file.path(data_path, "copernicus", "landuse_class3.tif"))
-lu4 <- file.path(file.path(data_path, "copernicus", "landuse_class4.tif"))
-lu5 <- file.path(file.path(data_path, "copernicus", "landuse_class5.tif"))
+lu1 <- file.path(file.path(data_dir, "copernicus", "landuse_class1.tif"))
+lu2 <- file.path(file.path(data_dir, "copernicus", "landuse_class2.tif"))
+lu3 <- file.path(file.path(data_dir, "copernicus", "landuse_class3.tif"))
+lu4 <- file.path(file.path(data_dir, "copernicus", "landuse_class4.tif"))
+lu5 <- file.path(file.path(data_dir, "copernicus", "landuse_class5.tif"))
 landuse <- c(lu1, lu2, lu3, lu4, lu5)
 
 ## Processing covariate layers ####
@@ -191,13 +197,13 @@ all(lapply(cov_files, file.exists))
 ## step one_clip by e
 infile <- cov_files
 # file_in <- c(bioclim, srtm, soil, landuse)
-outfile <- file.path(data_processed, paste0(tools::file_path_sans_ext(basename(infile)), "_cropped.", tools::file_ext(infile)))
-reso_wgs <- res(raster(file.path(data_path, "global_mask_crop.tif")))
+outfile <- file.path(processed_dir, paste0(tools::file_path_sans_ext(basename(infile)), "_cropped.", tools::file_ext(infile)))
+reso_wgs <- res(raster(file.path(data_dir, "global_mask_crop.tif")))
 e <- c(-180,180,-60,90)
 mapply(gdalCrop, inpath = infile, outpath = outfile, MoreArgs = list(extent=e, resolution=reso_wgs, return = FALSE)) 
 
 ## step two_reproject: Equal Earth
-infile <- outfile #list.files(data_processed, pattern = "_cropped", full.names = TRUE)
+infile <- outfile #list.files(processed_dir, pattern = "_cropped", full.names = TRUE)
 outfile <- sub("_cropped", "_aligned", infile)
 reso_ee <- c(1000,1000)
 wgs_crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" 
@@ -210,15 +216,15 @@ mapply(gdalwarp, srcfile = infile, dstfile = outfile, MoreArgs = list(s_srs = wg
 outfile2 <- sub("_aligned", "_masked", outfile)
 outfile2 <- paste0(tools::file_path_sans_ext(outfile2), ".tif")
 
-mask_file <- file.path(data_path, "global_mask_ee.tif")
+mask_file <- file.path(data_dir, "global_mask_ee.tif")
 mapply(gdalmask, infile = outfile, mask = mask_file, outfile = outfile2, MoreArgs = list(output_Raster = FALSE, overwrite=FALSE, verbose=TRUE))
 # file.remove(c(infile, outfile))
 
 
 ## Find min non-NA set values across mask and covariates and sync NAs ####
-infile <- list.files(data_processed, pattern = "_masked", full.names = TRUE)
-mask_file <- file.path(data_path, "global_mask_ee.tif")
-mask_file2 <- file.path(data_processed, "global_mask_ee_nona.tif")
+infile <- list.files(processed_dir, pattern = "_masked", full.names = TRUE)
+mask_file <- file.path(data_dir, "global_mask_ee.tif")
+mask_file2 <- file.path(processed_dir, "global_mask_ee_nona.tif")
 file.copy(mask_file, mask_file2)
 
 for(j in 1:length(infile)){
@@ -247,29 +253,29 @@ lapply(infile, gdalinfo, stats = TRUE)
 
 
 ## Create global SpatialPointsDataFrame object ####
-mask_path <- file.path(data_processed, "global_mask_ee_nona.tif")
+mask_path <- file.path(processed_dir, "global_mask_ee_nona.tif")
 global_mask0 <- raster(mask_path)
 global_mask0[which(is.na(global_mask0[]))] <- 0
 rpts <- rasterToPoints(global_mask0, spatial=TRUE)
 global_mask_df <- data.frame(rpts@data, X=coordinates(rpts)[,1], Y=coordinates(rpts)[,2])     
 global_mask_df <- global_mask_df[,-1]
-saveRDS(global_mask_df, file = file.path(data_path, "global_sp_pts_df.rds"))
+saveRDS(global_mask_df, file = file.path(data_dir, "global_sp_pts_df.rds"))
 
 
 ## Separate out srtm variables & save as tifs ####
-infile <- list.files(data_processed, pattern = "_masked", full.names = TRUE)
+infile <- list.files(processed_dir, pattern = "_masked", full.names = TRUE)
 elevation <- raster(infile[grep("srtm", infile)])
-writeRaster(elevation, filename = file.path(data_processed, "elevation_masked.tif"))
+writeRaster(elevation, filename = file.path(processed_dir, "elevation_masked.tif"))
 aspect <- terrain(elevation, opt = "aspect")
-writeRaster(aspect, filename = file.path(data_processed, "aspect_masked.tif"))
+writeRaster(aspect, filename = file.path(processed_dir, "aspect_masked.tif"))
 slope <- terrain(elevation, opt = 'slope')
-writeRaster(slope, filename = file.path(data_processed, "slope_masked.tif"))
+writeRaster(slope, filename = file.path(processed_dir, "slope_masked.tif"))
 roughness <- terrain(elevation, opt = "roughness")
-writeRaster(roughness, filename = file.path(data_processed, "roughness_masked.tif"))
+writeRaster(roughness, filename = file.path(processed_dir, "roughness_masked.tif"))
 
 
 ## Check for correlations, subset and save covariates ####
-infile <- list.files(data_processed, pattern = "_masked.tif$", full.names = TRUE)
+infile <- list.files(processed_dir, pattern = "_masked.tif$", full.names = TRUE)
 infile <- infile[-grep("srtm", infile)]
 
 ## Issue: some rasters show values and others don’t, but all have values when plotted
@@ -292,10 +298,10 @@ covs_list <- list(covs_model = covs_model,
 ## Save landuse covariate names
 lucovs <- tools::file_path_sans_ext(basename(infile))[grep("landuse", basename(infile))]
 lucovs <- sub("_masked", "", lucovs)
-saveRDS(lucovs, file = file.path(data_processed, "lucovs.rds"))
+saveRDS(lucovs, file = file.path(processed_dir, "lucovs.rds"))
 
 ## Subset data to uncorrelated variables: covs_model
-global_mask_df <- readRDS(file.path(data_path, "global_sp_pts_df.rds"))
+global_mask_df <- readRDS(file.path(data_dir, "global_sp_pts_df.rds"))
 
 for(i in 1:length(covs_list)) {
   
@@ -309,7 +315,7 @@ for(i in 1:length(covs_list)) {
     
     ## Test for correlations
     preds <- colnames(correlations(model_data, thresh = 0.7, N = 200000))
-    saveRDS(preds, file = file.path(data_processed, paste0("preds", ".rds")))
+    saveRDS(preds, file = file.path(processed_dir, paste0("preds", ".rds")))
     
   } else {
     
@@ -322,10 +328,10 @@ for(i in 1:length(covs_list)) {
   
   ## Save final datasets
   model_data <- model_data[,colnames(model_data) %in% c(preds, lucovs, "X", "Y")] ## retain landuse, X, Y layers 
-  saveRDS(model_data, file = file.path(data_processed, paste0(names(covs_list)[i], ".rds")))
+  saveRDS(model_data, file = file.path(processed_dir, paste0(names(covs_list)[i], ".rds")))
 }
 
 
-mask_file <- file.path(data_path, "global_mask_ee.tif")
+mask_file <- file.path(data_dir, "global_mask_ee.tif")
 globalmask <- raster(mask_file)
 
