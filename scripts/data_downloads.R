@@ -259,40 +259,63 @@ unzip("data/soil.zip", exdir = "/tempdata/workdir/data")
 file.rename(paste0("/tempdata/workdir/data/", temp$Name), sub(file_path_sans_ext(basename(temp$Name)),"soil", paste0("/tempdata/workdir/data/", temp$Name)))
 file.remove("data/soil.zip")
 
-## Landuse ----- reclassify, resample, download by tile and stich tiles ####
-## Source: Copernicus data
-## Link @ GEE: https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V_Global
-## Direct download link: https://zenodo.org/communities/copernicus-land-cover/search?page=1&size=20
-## Data processing for global layer @ GEE by MC Loor: https://code.earthengine.google.com/?scriptPath=users%2Fpayalbal%2Fglobal_layers%3Afraclu_mcloor_sklu. See processing in GEE for reclassification scheme.
+## Landuse ----- ####
+## Source: ESA - Climate Research Data Package (CRDP)
+## http://maps.elie.ucl.ac.be/CCI/viewer/download.php
+## Click on 'Copernicus Climate Change Service (C3S) Climate Data Store (CDS)' link
+## > Download Data (login if required)
+## Select options (here, 2018, v2.1.1, .tar.gz)
+## Submit request > Right click Download button and Copy link location
+system("wget -np -nH --reject 'index.html*' -e robots=off https://download-0009.copernicus-climate.eu/cache-compute-0009/cache/data3/dataset-satellite-land-cover-3c12d11c-1b01-4054-95ee-339179fbfa76.tar.gz -O /home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse_ESA/dataset-satellite-land-cover-3c12d11c-1b01-4054-95ee-339179fbfa76.tar.gz")
 
-  ## Land use classes used:
-  ## 1	urban
-  ## 2	crop
-  ## 3	forest
-  ## 4	grass
-  ## 5	other 
-  ## 6	NA
+ludir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse_ESA"
+landuse <- list.files(ludir, pattern = ".tar",
+                      full.names = TRUE)
+system("tar -tvf ", landuse)
+system(paste0("tar -xzvf ", landuse, " --directory ", getwd())) ## does not work out of home directory
 
-... gee.py script
-...download by title
+landuse <- list.files(getwd(), pattern = ".nc",
+                      full.names = TRUE)
+system(paste0("gdalwarp -of Gtiff -co COMPRESS=LZW -co TILED=YES -ot Byte -te -180.0000000 -90.0000000 180.0000000 90.0000000 -tr 0.002777777777778 0.002777777777778 -t_srs EPSG:4326 NETCDF:", landuse, ":lccs_class ", file.path(ludir, basename(tools::file_path_sans_ext(landuse))), ".tif"))
 
-## Stiching tiles
-## Author: Maria del Mar Quiroga, based on: https://stackoverflow.com/a/50235578
-library(gdalUtils)
+file.rename(paste0(file.path(ludir, basename(tools::file_path_sans_ext(landuse))), ".tif"), 
+            file.path(ludir,"ESA_landuse.tif"))
+file.remove(landuse)
 
-# Get a list of all tif tiles downloaded from Google Earth Engine
-tiffiles <- list.files(path="/tempdata/workdir/data/copernicus/tifs/", pattern="*.tif", full.names = TRUE)
-
-# Build a virtual raster file stitching all tiles
-# WARNING: This will fail if the file it is trying to write to (output.vrt) already exists
-gdalbuildvrt(gdalfile = tiffiles, output.vrt = "/tempdata/workdir/troubleshooting/outputs/lu_world.vrt")
-
-# Copy the virtual raster to an actual physical file
-# WARNING: This takes ~5 minutes to run
-gdal_translate(src_dataset = "/tempdata/workdir/troubleshooting/outputs/lu_world.vrt", 
-               dst_dataset = "/tempdata/workdir/troubleshooting/outputs/lu_world.tif", 
-               output_Raster = TRUE,
-               options = c("BIGTIFF=YES", "COMPRESSION=LZW"))
+  # ## Alternative source (fractional data): Copernicus data
+  # ## ------- reclassify, resample, download by tile and stich tiles
+  # ## Link @ GEE: https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V_Global
+  # ## Direct download link: https://zenodo.org/communities/copernicus-land-cover/search?page=1&size=20
+  # ## Data processing for global layer @ GEE by MC Loor: https://code.earthengine.google.com/?scriptPath=users%2Fpayalbal%2Fglobal_layers%3Afraclu_mcloor_sklu. See processing in GEE for reclassification scheme.
+  # 
+  # ## Land use classes used:
+  # ## 1	urban
+  # ## 2	crop
+  # ## 3	forest
+  # ## 4	grass
+  # ## 5	other 
+  # ## 6	NA
+  # 
+  # ... gee.py script
+  # ...download by title
+  # 
+  # ## Stiching tiles
+  # ## Author: Maria del Mar Quiroga, based on: https://stackoverflow.com/a/50235578
+  # library(gdalUtils)
+  # 
+  # # Get a list of all tif tiles downloaded from Google Earth Engine
+  # tiffiles <- list.files(path="/tempdata/workdir/data/copernicus/tifs/", pattern="*.tif", full.names = TRUE)
+  # 
+  # # Build a virtual raster file stitching all tiles
+  # # WARNING: This will fail if the file it is trying to write to (output.vrt) already exists
+  # gdalbuildvrt(gdalfile = tiffiles, output.vrt = "/tempdata/workdir/troubleshooting/outputs/lu_world.vrt")
+  # 
+  # # Copy the virtual raster to an actual physical file
+  # # WARNING: This takes ~5 minutes to run
+  # gdal_translate(src_dataset = "/tempdata/workdir/troubleshooting/outputs/lu_world.vrt", 
+  #                dst_dataset = "/tempdata/workdir/troubleshooting/outputs/lu_world.tif", 
+  #                output_Raster = TRUE,
+  #                options = c("BIGTIFF=YES", "COMPRESSION=LZW"))
 
 
   # ## Alternative source (fractional data) - Hoskins data 

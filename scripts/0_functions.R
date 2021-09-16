@@ -47,7 +47,7 @@ catch_errors <- function(i, ppm_models, species_names, errorfile) {
 ## Author: Simon Kapitza
 ## Reduce predictor set by dropping predictors with highest corrleation with another predictor
 ## Same function used in the landuse model
-correlations <- function(covs, thresh = 0.7, N = 15000) {
+correlations <- function(covs, thresh = 0.7, N = 50000) {
   subs_cor <- sample(1:nrow(covs), size = N) # subset covs to calculate correlations
   cors <- cor(covs[subs_cor, ], method = "spearman")
   while (min(abs(cors[abs(cors) >= thresh])) != 1){
