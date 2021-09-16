@@ -1,7 +1,7 @@
 
 ##'@title filter.gbif.R
 ##'
-##'@description Processing for GBIF data from processed gbif database on server.
+##'@description Running filters on processed GBIF database on server.
 ##'
 ##'@param gbif.download.data (data.table) A data.table holding the downloaded GBIF data. GBIF.org 15th October 2018 GBIF Occurrence Download https://doi.org/10.15468/dl.g2zaxo
 ##'@param gbif.nub.taxonomy (data.table) A data.table holding the downloaded GBIF backbone taxonomy. 5 February 2018 https://www.gbif.org/dataset/d7dddbf4-2cf0-4f39-9b2a-bb099caae36c#description
