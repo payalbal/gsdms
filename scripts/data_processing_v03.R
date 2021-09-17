@@ -118,7 +118,7 @@ file.remove(outfile)
 
 
 ## ----------------------------------------------------------------------------- ##
-## Processing categorical covariate layers (land use) - Equal Area projection ####
+## Processing CATEGORICAL covariate layers (land use) - Equal Area projection ####
 ## ----------------------------------------------------------------------------- ## 
 
 ## Land use 
@@ -148,9 +148,11 @@ system(paste0("gdalwarp -overwrite -ot Byte",
               infile, " ", outfile))
 
 
-## step three_create separate tif for each landuse class
+## >> step three_create separate tif for each landuse class ####
 infile <- outfile
 gdalUtils::gdalinfo(infile)
+## get unique values: https://gis.stackexchange.com/questions/33388/python-gdal-get-unique-values-in-discrete-valued-raster
+## run python code: https://rstudio.github.io/reticulate/
 
 vals <- 1:9
 class <- c("crop", "crop_mosaic", "forest", "grass", 
@@ -158,10 +160,13 @@ class <- c("crop", "crop_mosaic", "forest", "grass",
 
 outfile <- file.path(output_dir, paste0("lu", vals, class))
 
-....
 parallel::mclapply(seq_along(vals),
-                   function(x) system(x
-                                      ),
+                   function(x) system(paste0("gdal_calc.py -A ", infile,
+                                             " --calc='((A==", x, "))*1 + (",
+                                             paste0("(A==", vals[-x], ")",
+                                                    collapse = " + "),
+                                             ")*0' --NoDataValue=0",
+                                             " --outfile=", outfile[x])),
                    mc.cores = mc.cores, mc.preschedule = TRUE)
 
 system(paste0("gdal_calc.py -A ", infile,
@@ -177,6 +182,9 @@ gdalUtils::gdalinfo(outfile)
 
 ## >> step three_reproject: Equal Earth ####
 ## resamplig method: near (https://support.esri.com/en/technical-article/000005606)
+
+## see: https://gis.stackexchange.com/questions/352476/bilinear-resampling-with-gdal-leaves-holes
+
 infile <- outfile #list.files(output_dir, pattern = "_clip", full.names = TRUE)
 outfile <- gsub("_clip", "_ee", infile)
 new_res <- c(10000,10000)
@@ -269,7 +277,7 @@ file.remove(infile)
 
 
 ## --------------------------------------------------------------------------- ##
-## Processing continuous covariate layers - Equal Area projection ####
+## Processing CONTINUOUS covariate layers - Equal Area projection ####
 ## --------------------------------------------------------------------------- ##
 
 ## SRTM
