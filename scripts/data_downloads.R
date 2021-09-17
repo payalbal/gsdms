@@ -266,9 +266,9 @@ file.remove("data/soil.zip")
 ## > Download Data (login if required)
 ## Select options (here, 2018, v2.1.1, .tar.gz)
 ## Submit request > Right click Download button and Copy link location
-system("wget -np -nH --reject 'index.html*' -e robots=off https://download-0009.copernicus-climate.eu/cache-compute-0009/cache/data3/dataset-satellite-land-cover-3c12d11c-1b01-4054-95ee-339179fbfa76.tar.gz -O /home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse_ESA/dataset-satellite-land-cover-3c12d11c-1b01-4054-95ee-339179fbfa76.tar.gz")
+system("wget -np -nH --reject 'index.html*' -e robots=off https://download-0009.copernicus-climate.eu/cache-compute-0009/cache/data3/dataset-satellite-land-cover-3c12d11c-1b01-4054-95ee-339179fbfa76.tar.gz -O /home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse/CCI/dataset-satellite-land-cover-3c12d11c-1b01-4054-95ee-339179fbfa76.tar.gz")
 
-ludir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse_ESA"
+ludir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse/CCI"
 landuse <- list.files(ludir, pattern = ".tar",
                       full.names = TRUE)
 system("tar -tvf ", landuse)
@@ -282,13 +282,12 @@ file.rename(paste0(file.path(ludir, basename(tools::file_path_sans_ext(landuse))
             file.path(ludir,"ESA_landuse.tif"))
 file.remove(landuse)
 
-## Updated data: https://lcviewer.vito.be/download
-
 
   # ## Alternative source (fractional data): Copernicus data
   # ## ------- reclassify, resample, download by tile and stich tiles
   # ## Link @ GEE: https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V_Global
   # ## Direct download link: https://zenodo.org/communities/copernicus-land-cover/search?page=1&size=20
+  # ## Data viewer: https://lcviewer.vito.be/download
   # ## Data processing for global layer @ GEE by MC Loor: https://code.earthengine.google.com/?scriptPath=users%2Fpayalbal%2Fglobal_layers%3Afraclu_mcloor_sklu. See processing in GEE for reclassification scheme.
   # 
   # ## Land use classes used:

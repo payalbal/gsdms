@@ -22,7 +22,7 @@ rm(x)
 
 ## Folder paths
 data_dir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data"
-output_dir <- file.path(data_dir, "layers_10k")
+output_dir <- file.path(data_dir, "processed_data_10k")
 if(!dir.exists(output_dir)) {
   dir.create(output_dir)
 }
@@ -41,14 +41,14 @@ if(!dir.exists(output_dir)) {
 ## Functions
 source("/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/scripts/0_functions.R")
 source("/home/payalb/gsdms_r_vol/tempdata/workdir/landuse_projects/land-use/gdal_calc.R") # by jgarber
-  # ## To pull directly from jgarber's repo:
-  # library(RCurl)
-  # url <- "https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R"
-  # url.exists(url)
-  # source(url)
-  # devtools::source_url(url)
-  # url <- "https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons.git"
-  # devtools::install_git(url = url)
+# ## To pull directly from jgarber's repo:
+# library(RCurl)
+# url <- "https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R"
+# url.exists(url)
+# source(url)
+# devtools::source_url(url)
+# url <- "https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons.git"
+# devtools::install_git(url = url)
 
 
 
@@ -90,7 +90,7 @@ system(paste0("gdalwarp -overwrite -ot Byte -tr ",
               paste(new_res, collapse = " "),
               " -t_srs '", new_crs, "' ",
               infile, " ", outfile))
-  # gdalwarp(outfile, outfile2, s_srs = wgs_crs, t_srs = new_crs, tr = reso_ee) #, output_Raster =TRUE, verbose=TRUE) #these extra arguments were used to see what was going on and the output
+# gdalwarp(outfile, outfile2, s_srs = wgs_crs, t_srs = new_crs, tr = reso_ee) #, output_Raster =TRUE, verbose=TRUE) #these extra arguments were used to see what was going on and the output
 raster(infile)
 raster(outfile)
 unique(values(raster(outfile)))
@@ -124,8 +124,8 @@ file.remove(outfile)
 ## Land use 
 ## >> Source: ESA (fractional land use) ####
 ## http://maps.elie.ucl.ac.be/CCI/viewer/download.php 
-landuse <- list.files("/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse_ESA",
-                      pattern = ".tif$", full.names = TRUE)
+landuse <- list.files("/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse/CCI",
+                      pattern = "landuse.tif$", full.names = TRUE)
 outfile <- gsub("ESA_landuse", "ESA_landuse_reclass", landuse)
 
 ## >> step one_reclassify ####
@@ -146,6 +146,33 @@ new_extent <- "-180 -60 180 90"
 system(paste0("gdalwarp -overwrite -ot Byte",
               " -te ", new_extent, " ",
               infile, " ", outfile))
+
+
+## step three_create separate tif for each landuse class
+infile <- outfile
+gdalUtils::gdalinfo(infile)
+
+vals <- 1:9
+class <- c("crop", "crop_mosaic", "forest", "grass", 
+           "shrub", "wetland", "urban", "other", "water")
+
+outfile <- file.path(output_dir, paste0("lu", vals, class))
+
+....
+parallel::mclapply(seq_along(vals),
+                   function(x) system(x
+                                      ),
+                   mc.cores = mc.cores, mc.preschedule = TRUE)
+
+system(paste0("gdal_calc.py -A ", infile,
+              " --calc='((A==", j, "))*1 + (", paste0("(A==", vals[-j], ")", collapse = " + "), ")*0' --NoDataValue=0",
+              " --outfile=", outfile))
+gdalUtils::gdalinfo(outfile)
+
+# system(paste0("gdal_calc.py -A ", infile,
+#               " --calc='((A==1))*1 + ((A==0) + (A==2) + (A==3) + (A==4) + (A==5) + (A==6) + (A==7) + (A==8) + (A==9))*0' --NoDataValue=0",
+#               " --outfile=", outfile))
+
 
 
 ## >> step three_reproject: Equal Earth ####
@@ -190,54 +217,54 @@ system(paste0("gdal_calc.py -A ", infile, " -B ", mask_file,
 gdalUtils::gdalinfo(outfile)
 file.remove(infile)
 
-  # ## >> Source: Copernicus (fractional land use) ####
-  # ## Link @ GEE: https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V_Global
-  # ## Direct download link: https://zenodo.org/communities/copernicus-land-cover/search?page=1&size=20
-  # ## Data processing for global layer @ GEE by MC Loor: https://code.earthengine.google.com/?scriptPath=users%2Fpayalbal%2Fglobal_layers%3Afraclu_mcloor_sklu. See processing in GEE for reclassification scheme.
-  # 
-  # ## Land use classes used:
-  # ## 1    urban
-  # ## 2    crop
-  # ## 3    forest
-  # ## 4    grass
-  # ## 5    other
-  # ## 6    NA
-  # 
-  # # ... gee.py script
-  # # ...download by tile
-  # 
-  # ## Stiching tiles by Maria del Mar Quiroga
-  # ## ref: https://stackoverflow.com/a/50235578
-  # 
-  # ## step one_Get a list of all tif tiles downloaded from Google Earth Engine
-  # tile_files <- list.files(path = file.path(data_dir, "copernicus/global_frac/sklu_classes/tifs/"), pattern = "*.tif", full.names = TRUE)
-  # 
-  # ## step two_Build a virtual raster file stitching all tiles
-  # ## WARNING: This will fail if the file it is trying to write to (output.vrt) already exists
-  # gdalbuildvrt(gdalfile = tile_files, output.vrt = file.path(data_dir, "copernicus","lu_world.vrt"))
-  # 
-  # ## step three_Copy the virtual raster to an actual physical file
-  # ## WARNING: This takes ~5 minutes to run
-  # gdal_translate(src_dataset = file.path(data_dir, "copernicus", "lu_world.vrt"), 
-  #                dst_dataset = file.path(data_dir, "copernicus", "lu_world.tif"), 
-  #                output_Raster = FALSE,
-  #                options = c("BIGTIFF=YES", "COMPRESSION=LZW"))
-  # 
-  # ## step four_Save each band (i.e. land use class) as a tif file
-  # landuse <- file.path(file.path(data_dir, "copernicus", "lu_world.tif"))
-  # landuse <- brick(landuse)
-  # for (i in 1:nlayers(landuse)){
-  #   temp <- landuse[[i]]
-  #   writeRaster(temp, filename = file.path(data_dir, "copernicus", paste0("landuse_class", i, ".tif")))
-  # }
-  # rm(temp, landuse)
-  # ## landuse classes: urban, crop, forest, grass, other
-  # lu1 <- file.path(file.path(data_dir, "copernicus", "landuse_class1.tif"))
-  # lu2 <- file.path(file.path(data_dir, "copernicus", "landuse_class2.tif"))
-  # lu3 <- file.path(file.path(data_dir, "copernicus", "landuse_class3.tif"))
-  # lu4 <- file.path(file.path(data_dir, "copernicus", "landuse_class4.tif"))
-  # lu5 <- file.path(file.path(data_dir, "copernicus", "landuse_class5.tif"))
-  # landuse <- c(lu1, lu2, lu3, lu4, lu5)
+# ## >> Source: Copernicus (fractional land use) ####
+# ## Link @ GEE: https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V_Global
+# ## Direct download link: https://zenodo.org/communities/copernicus-land-cover/search?page=1&size=20
+# ## Data processing for global layer @ GEE co-authored by MC Loor: https://code.earthengine.google.com/?scriptPath=users%2Fpayalbal%2Fglobal_layers%3Afraclu_sklu. See processing in GEE for reclassification scheme.
+# 
+# ## Land use classes used:
+# ## 1    urban
+# ## 2    crop
+# ## 3    forest
+# ## 4    grass
+# ## 5    other
+# ## 6    NA
+# 
+# # ... gee.py script
+# # ...download by tile
+# 
+# ## Stiching tiles by Maria del Mar Quiroga
+# ## ref: https://stackoverflow.com/a/50235578
+# 
+# ## step one_Get a list of all tif tiles downloaded from Google Earth Engine
+# tile_files <- list.files(path = file.path(data_dir, "copernicus/global_frac/sklu_classes/tifs/"), pattern = "*.tif", full.names = TRUE)
+# 
+# ## step two_Build a virtual raster file stitching all tiles
+# ## WARNING: This will fail if the file it is trying to write to (output.vrt) already exists
+# gdalbuildvrt(gdalfile = tile_files, output.vrt = file.path(data_dir, "copernicus","lu_world.vrt"))
+# 
+# ## step three_Copy the virtual raster to an actual physical file
+# ## WARNING: This takes ~5 minutes to run
+# gdal_translate(src_dataset = file.path(data_dir, "copernicus", "lu_world.vrt"), 
+#                dst_dataset = file.path(data_dir, "copernicus", "lu_world.tif"), 
+#                output_Raster = FALSE,
+#                options = c("BIGTIFF=YES", "COMPRESSION=LZW"))
+# 
+# ## step four_Save each band (i.e. land use class) as a tif file
+# landuse <- file.path(file.path(data_dir, "copernicus", "lu_world.tif"))
+# landuse <- brick(landuse)
+# for (i in 1:nlayers(landuse)){
+#   temp <- landuse[[i]]
+#   writeRaster(temp, filename = file.path(data_dir, "copernicus", paste0("landuse_class", i, ".tif")))
+# }
+# rm(temp, landuse)
+# ## landuse classes: urban, crop, forest, grass, other
+# lu1 <- file.path(file.path(data_dir, "copernicus", "landuse_class1.tif"))
+# lu2 <- file.path(file.path(data_dir, "copernicus", "landuse_class2.tif"))
+# lu3 <- file.path(file.path(data_dir, "copernicus", "landuse_class3.tif"))
+# lu4 <- file.path(file.path(data_dir, "copernicus", "landuse_class4.tif"))
+# lu5 <- file.path(file.path(data_dir, "copernicus", "landuse_class5.tif"))
+# landuse <- c(lu1, lu2, lu3, lu4, lu5)
 
 
 
@@ -260,70 +287,70 @@ bio_rcp45 <- list.files(file.path(data_dir, "gcm_30s"), pattern = "*bc45*", full
 bio_rcp85 <- list.files(file.path(data_dir, "gcm_30s"), pattern = "*bc85*", full.names = TRUE)
 # bio_rcp60 <- list.files(file.path(data_dir, "gcm_30s"), pattern = "*bc60*", full.names = TRUE)
 
-  ## GCM data quartiles - TO DO...
-  # ## ALL GCMs
-  # ## Source: from regSSP scripts
-  # ## *** replace with gdal functions...
-  # rcps <- c("45", "60", "85")
-  # models <- c("BC", "CC", "GS", "HD", "HE", "IP", "MI", "MR", "MC", "MG", "NO")
-  # 
-  # mask_file <- file.path(data_dir, "global_mask_ee.tif")
-  # gcm_files <- list.files(file.path(data_dir, 'gcm_30s'), full.names = T, recursive = T)
-  # gcm_masked_path <- file.path(processed_dir, 'gcm_masked')
-  # if(!dir.exists(gcm_masked_path)){dir.create(gcm_masked_path)}
-  # 
-  # 
-  # ## Mask data & stack by GCM
-  # global_mask <- raster(mask_file)
-  # for(model_i in models){
-  #   mod_stack <- list()
-  #   file_mod <- files_gcm[grepl(model_i, files_gcm)]
-  #   for(j in 1:length(rcps)){
-  #     file_mod_rcp <- file_mod[grepl(rcps[j], file_mod)]
-  #     rcp_stack <- list()
-  #     for(f in 1:length(file_mod_rcp)){
-  #       rcp_stack[[f]] <- mask(crop(raster(file_mod_rcp[f]), global_mask), global_mask)
-  #     }
-  #     mod_stack[[j]] <- readAll(brick(rcp_stack))
-  #   }
-  #   saveRDS(mod_stack, file = paste0(gcm_reg_path, "/", model_i, ".rds"))
-  # }
-  # rm(rcp_stack, mod_stack)
-  # 
-  # ## Extract cell-wise quartiles across GCM
-  # quartiles <- c("q1", "q2", "q3")
-  # gcm_files <- list.files(gcm_masked_path, full.names = T)
-  # gcm_quant_path <- file.path(processed_dir, 'gcm_quant')
-  # if(!dir.exists(gcm_quant_path)){dir.create(gcm_quant_path)}
-  # 
-  # inds <- which(!is.na(global_mask[]))
-  # 
-  # for(j in 1:length(rcps)){
-  #   saveRDS(stack(), file = paste0(gcm_quant_path, "/bio", "q1_", rcps[j], ".rds"))
-  #   saveRDS(stack(), file = paste0(gcm_quant_path, "/bio", "q2_", rcps[j], ".rds"))
-  #   saveRDS(stack(), file = paste0(gcm_quant_path, "/bio", "q3_", rcps[j], ".rds"))
-  #   print(paste0("processing rcp", rcps[j]))
-  #   for(k in 1:19){
-  #     print(paste0("processing bioclim var: ", k))
-  #     bio <- stack()
-  #     for(i in 1:length(models)){
-  #       print(paste0("processing model: ", i))
-  #       dat <- readRDS(gcm_files[[i]])[[j]]
-  #       bio <- stack(bio, dat[[k]])
-  #     }
-  #     
-  #     print(paste0("getting quartiles..."))
-  #     df1 <- na.omit(as.matrix(getValues(bio)))
-  #     c <-rowQuantiles(df1, probs = c(0.25, 0.5, 0.75))
-  #     for(m in 1:3){
-  #       bioclim <- readRDS(file = paste0(gcm_quant_path, "/bio", quartiles[m], "_", rcps[j], ".rds"))
-  #       r[inds] <- c[,m]
-  #       names(r) <- paste0("bio", k)
-  #       saveRDS(readAll(stack(bioclim, r)), file = paste0(gcm_quant_path, "/bio", quartiles[m], "_", rcps[j], ".rds"))
-  #     }
-  #   }
-  # }
-  # unlink(gcm_masked_path, recursive=T)
+## GCM data quartiles - TO DO...
+# ## ALL GCMs
+# ## Source: from regSSP scripts
+# ## *** replace with gdal functions...
+# rcps <- c("45", "60", "85")
+# models <- c("BC", "CC", "GS", "HD", "HE", "IP", "MI", "MR", "MC", "MG", "NO")
+# 
+# mask_file <- file.path(data_dir, "global_mask_ee.tif")
+# gcm_files <- list.files(file.path(data_dir, 'gcm_30s'), full.names = T, recursive = T)
+# gcm_masked_path <- file.path(processed_dir, 'gcm_masked')
+# if(!dir.exists(gcm_masked_path)){dir.create(gcm_masked_path)}
+# 
+# 
+# ## Mask data & stack by GCM
+# global_mask <- raster(mask_file)
+# for(model_i in models){
+#   mod_stack <- list()
+#   file_mod <- files_gcm[grepl(model_i, files_gcm)]
+#   for(j in 1:length(rcps)){
+#     file_mod_rcp <- file_mod[grepl(rcps[j], file_mod)]
+#     rcp_stack <- list()
+#     for(f in 1:length(file_mod_rcp)){
+#       rcp_stack[[f]] <- mask(crop(raster(file_mod_rcp[f]), global_mask), global_mask)
+#     }
+#     mod_stack[[j]] <- readAll(brick(rcp_stack))
+#   }
+#   saveRDS(mod_stack, file = paste0(gcm_reg_path, "/", model_i, ".rds"))
+# }
+# rm(rcp_stack, mod_stack)
+# 
+# ## Extract cell-wise quartiles across GCM
+# quartiles <- c("q1", "q2", "q3")
+# gcm_files <- list.files(gcm_masked_path, full.names = T)
+# gcm_quant_path <- file.path(processed_dir, 'gcm_quant')
+# if(!dir.exists(gcm_quant_path)){dir.create(gcm_quant_path)}
+# 
+# inds <- which(!is.na(global_mask[]))
+# 
+# for(j in 1:length(rcps)){
+#   saveRDS(stack(), file = paste0(gcm_quant_path, "/bio", "q1_", rcps[j], ".rds"))
+#   saveRDS(stack(), file = paste0(gcm_quant_path, "/bio", "q2_", rcps[j], ".rds"))
+#   saveRDS(stack(), file = paste0(gcm_quant_path, "/bio", "q3_", rcps[j], ".rds"))
+#   print(paste0("processing rcp", rcps[j]))
+#   for(k in 1:19){
+#     print(paste0("processing bioclim var: ", k))
+#     bio <- stack()
+#     for(i in 1:length(models)){
+#       print(paste0("processing model: ", i))
+#       dat <- readRDS(gcm_files[[i]])[[j]]
+#       bio <- stack(bio, dat[[k]])
+#     }
+#     
+#     print(paste0("getting quartiles..."))
+#     df1 <- na.omit(as.matrix(getValues(bio)))
+#     c <-rowQuantiles(df1, probs = c(0.25, 0.5, 0.75))
+#     for(m in 1:3){
+#       bioclim <- readRDS(file = paste0(gcm_quant_path, "/bio", quartiles[m], "_", rcps[j], ".rds"))
+#       r[inds] <- c[,m]
+#       names(r) <- paste0("bio", k)
+#       saveRDS(readAll(stack(bioclim, r)), file = paste0(gcm_quant_path, "/bio", quartiles[m], "_", rcps[j], ".rds"))
+#     }
+#   }
+# }
+# unlink(gcm_masked_path, recursive=T)
 
 
 cov_files <- c(bio_current, bio_rcp45, bio_rcp85, srtm, soil)
@@ -331,7 +358,7 @@ all(lapply(cov_files, file.exists))
 
 ## Check SRS for files
 lapply(cov_files, gdalsrsinfo, as.CRS = TRUE)
-  ## shows ERROR due to blank CRS for soem files...
+## shows ERROR due to blank CRS for some files...
 
 ## >> step one_clip by e ####
 infile = cov_files
@@ -341,8 +368,8 @@ new_extent <- "-180 -60 180 90"
 
 parallel::mclapply(seq_along(infile),
                    function(x) system(paste0("gdalwarp -overwrite -ot Byte",
-                                              " -te ", new_extent, " ",
-                                              infile[x], " ", outfile[x])),
+                                             " -te ", new_extent, " ",
+                                             infile[x], " ", outfile[x])),
                    mc.cores = mc.cores, mc.preschedule = TRUE)
 
 
@@ -451,7 +478,7 @@ gdalinfo(mask_file, stats = TRUE)
 gdalinfo(mask_file2, stats = TRUE)
 
 lapply(infile, gdalinfo, stats = TRUE)
-  ## check size for all
+## check size for all
 lapply(infile, gdalsrsinfo, as.CRS = TRUE)
 
 n = 63
@@ -459,34 +486,6 @@ gdalinfo(outfile[n])
 raster(outfile[n])
 unique(values(raster(outfile[n])))
 plot(raster(outfile[n]), main = tools::file_path_sans_ext(basename(outfile[n])))
-
-
-
-
-## ------------------------------------------ ##
-## Create seperate tif for each LU class  ####
-## ----------------------------------------- ##
-
-landuse <- list.files(output_dir, pattern = "reclass_eqar.tif$", 
-                      full.names = TRUE, all.files = TRUE)
-vals <- sort(unique(values(raster(landuse))))
-vals <- vals[-1] ## to remove 0
-gdalUtils::gdalinfo(landuse)
-
-class <- c("crop", "crop_mosaic", "forest", "grass", 
-           "shrub", "wetland", "urban", "other", "water")
-
-infile <- landuse
-for (j in vals){
-  outfile <- gsub(".tif", paste0("_lu", j, class[j], ".tif"), infile)
-  system(paste0("gdal_calc.py -A ", infile,
-              " --calc='((A==", j, "))*1 + (", paste0("(A==", vals[-j], ")", collapse = " + "), ")*0' --NoDataValue=-9999",
-              " --outfile=", outfile))
-}
-
-  # system(paste0("gdal_calc.py -A ", infile,
-  #               " --calc='((A==1))*1 + ((A==0) + (A==2) + (A==3) + (A==4) + (A==5) + (A==6) + (A==7) + (A==8) + (A==9))*0' --NoDataValue=-9999",
-  #               " --outfile=", outfile))
 
 
 
@@ -519,11 +518,11 @@ file.rename(infile, gsub("srtm", "elevation", infile))
 ## -------------------------------------------------------- ##
 
 infile <- list.files(output_dir, pattern = "_eqar(.*).tif$", full.names = TRUE)
-  ## matching everything with _eqar and ending in .tif but also anythign in between the two using (.*)
+## matching everything with _eqar and ending in .tif but also anythign in between the two using (.*)
 infile <- infile[-grep('ESA_landuse_reclass_eqar.tif$', infile)]
-  ## remove ESA_landuse_reclass_eqar.tif
+## remove ESA_landuse_reclass_eqar.tif
 lapply(infile, gdalinfo, stats = TRUE)
-  ## check size for all
+## check size for all
 
 
 ## >> Generate quadrature (background) points - TO MODIFY ####

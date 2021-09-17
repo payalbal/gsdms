@@ -23,7 +23,7 @@ source("/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/scripts/0_functions.R")
 
 ## Server paths
 data_dir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data"
-input_dir <- file.path(data_dir, "data_10k")
+input_dir <- file.path(data_dir, "processed_data_10k")
 output_dir <- file.path(data_dir, "ppm_outputs_10k")
 if(!dir.exists(output_dir)) {
   dir.create(output_dir)
@@ -364,10 +364,7 @@ fit_ppms_apply <- function(i, spdat, bkdat, interaction_terms,
     ##  1. If number of observations <= min.obs (default as 60), 
     ##    use only the spatial covariates i.e. lat and long and offset. This gives 6 
     ##    terms: X, Y, X^2, Y^2, X:Y (linear, quadratic with interaction), offset
-    ##  2. If number of observations is between min.obs and min.obs+10*, add landuse covariate.
-    ##    *10 as per the one-in-ten rule (see point 3).Factor variables are fit as 1 variable only, 
-    ##    irrespective of the number of levels within
-    ##  3. If number of observatons > min.obs, 
+    ##  2. If number of observatons > min.obs, 
     ##    use the one-in-ten rule (https://en.wikipedia.org/wiki/One_in_ten_rule)
     ##    where, an additional covariate is added for every 10 additonal observations.
     ##    Because we fit poly with degree 2, adding a covariate will add two 
