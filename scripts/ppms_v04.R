@@ -1,4 +1,4 @@
-## P.S. there's lots more that can be cleaned out of this file for final, but I want to treat it as a master copy for dev. 
+## Fitting PPMs to GBIF data
 
 ## Set up work environment ####
 rm(list = ls())
@@ -19,15 +19,20 @@ lapply(x, require, character.only = TRUE)
 rm(x)
 
 ## Functions
-
+source("/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/scripts/0_functions.R")
 
 ## Server paths
 data_dir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data"
-input_dir <- file.path(data_dir, "layers_10k")
-output_dir <- file.path(data_dir, "outputs_10k")
+input_dir <- file.path(data_dir, "data_10k")
+output_dir <- file.path(data_dir, "ppm_outputs_10k")
 if(!dir.exists(output_dir)) {
   dir.create(output_dir)
 }
+
+
+## Specify global parameters here ####
+bkpts <- 10000 # number of background points
+n.fits <- 20
 
 
 ## Master log file ####
@@ -43,11 +48,7 @@ cat(paste0("---------------------------------------------"), file = masterlog, a
 datestamp <- gsub("-", "", format(Sys.time(), "%F")) ## used later to extract results
 
 
-
-## Specify global parameters here ####
-bkpts <- 10000 # number of background points
-n.fits <- 20
-
+## Scenario labels
 ssps <- c("ssp1","ssp5") #paste0("ssp", 1:3)
 rcps <- c("45", "85") #c("45", "60", "85")
 quartiles <- "q2" #c("q2", "q1", "q3")
@@ -57,35 +58,32 @@ scens_rcps <- sort(apply(expand.grid(quartiles, rcps), 1, paste0, collapse="_"))
 
 
 
+## Biodiversity data ####
+  # ## Section to be moved to gbif_processing script later
+  # gbif_wgs <- fread(file.path(data_dir, "gbif/2019-05-14_gbif_iucnsp.csv"))
+  # gbif_wgs[, .N, species]
+  # gbif_wgs <- as.data.frame(gbif_wgs)
+  # 
+  # ## Project biodiv data points in equal area projection - TO MODIFY
+  # ## Need to swap out SpatialPointsDataFrame() when working with full GBIF dataset
+  # wgs_crs  <-  "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+  # eqarea_crs <- "+proj=eqearth +datum=WGS84 +ellps=WGS84 +wktext" ## check conversion; looks finne in QGIS
+  # spdf <- SpatialPointsDataFrame(coords = gbif_wgs[c("decimallongitude", "decimallatitude")],
+  #                                data =gbif_wgs, proj4string = CRS(wgs_crs))
+  # spdf <- spTransform(spdf, CRSobj = CRS(eqarea_crs))
+  # 
+  # gbif <- as.data.table(spdf)
+  # gbif <- gbif[,c(6,7,2,1,5)]
+  # names(gbif)[1:2] <- c("X", "Y")
+  # head(gbif)
+  # fwrite(gbif, file = file.path(output_dir, "2019-05-14_gbif_iucnsp_EA.csv"))
 
-## I. Data ####
-
-## >> Biodiversity data ####
-## Section to be moved to gbif_processing script later
-gbif_wgs <- fread(file.path(data_dir, "gbif/2019-05-14_gbif_iucnsp.csv"))
-gbif_wgs[, .N, species]
-gbif_wgs <- as.data.frame(gbif_wgs)
-
-## Project biodiv data points in equal area projection - TO MODIFY
-## Need to swap out SpatialPointsDataFrame() when working with full GBIF dataset
-wgs_crs  <-  "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
-eqarea_crs <- "+proj=eqearth +datum=WGS84 +ellps=WGS84 +wktext" ## check conversion; looks finne in QGIS
-spdf <- SpatialPointsDataFrame(coords = gbif_wgs[c("decimallongitude", "decimallatitude")],
-                               data =gbif_wgs, proj4string = CRS(wgs_crs))
-spdf <- spTransform(spdf, CRSobj = CRS(eqarea_crs))
-
-gbif <- as.data.table(spdf)
-gbif <- gbif[,c(6,7,2,1,5)]
-names(gbif)[1:2] <- c("X", "Y")
-head(gbif)
-fwrite(gbif, file = file.path(output_dir, "2019-05-14_gbif_iucnsp_EA.csv"))
-
-occdat <- gbif[,.(X, Y, species)]
-rm(gbif, gbif_wgs)
+occdat <- fread(file.path(input_dir, "2019-05-14_gbif_iucnsp_EA.csv"))[,.(X, Y, species)]
 
 
 
-## >> Offset/Samplig bias (using all records) - TO FIX ####
+
+## Offset/Samplig bias (using all records) - SKIP TO PLUG IN CODE HERE ####
 ## Section to be moved to data_processing script later
 ## ISSUE 1: Uses up too much memory for global analysis causing session/MRC instance crash
 ## ISSUE 2: raster::area() only works with WGS projection
@@ -153,8 +151,9 @@ rm(gbif, gbif_wgs)
 
 
 
-## >> Covariate data ####
-## >> >> Background points ####
+## Covariate data ####
+## >> Background points ####
+## See data_processing for background point generation & if an alternate approach is to be used
 backxyz <- fread(file.path(input_dir, "covariates_model.csv"))
 
 ## Add offset
@@ -167,15 +166,13 @@ backxyz200k$Pres <- rep(0, dim(backxyz200k)[1])
 ## Checks
 summary(backxyz200k)
 global.mask <- raster(file.path(input_dir, "globalmask_10k_ee_minNA.tif"))
-
 plot(global.mask, legend = FALSE)
-plot(rasterFromXYZ(backxyz[,1:3]), col = "grey", add = TRUE, legend=FALSE)
+# plot(rasterFromXYZ(backxyz[,1:3]), col = "grey", add = TRUE, legend=FALSE)
 plot(rasterFromXYZ(backxyz200k[,1:3]), col = "red", add = TRUE, legend=FALSE)
-points(gbif[,1:2], col = "yellow")
- ## not sure why it doesn't plot properly in R, in QGIS is fine
+points(occdat[,1:2], col = "yellow", pch = 20, cex = 0.3)
 
 
-## >> >> Prediction points (as per scenario) ####
+## >> Prediction points (according to scenarios) ####
 # predxyz <- fread(file.path(input_dir, "covariates_predict_rcp45.csv"))
 predxyz <- fread(file.path(input_dir, "covariates_predict_rcp85.csv"))
 
@@ -184,7 +181,7 @@ predxyz <- cbind(covs_predict, off.bias)
 
 
 
-## >> Check that NA syncs across all input layers ####
+## >> Check that NA syncs across all covariate layers ####
 ## use gdal_calc function if NAs need to be synced
 
 
@@ -192,29 +189,27 @@ predxyz <- cbind(covs_predict, off.bias)
 
 
 
-## II. Define model parameters ####
-
-model_prep_start <- Sys.time()
-cat(paste0("\n\nModel prep start = ", model_prep_start, "\n"), file = masterlog, append = TRUE)
-
-
-## Specify covariates with interactions
+## Define model parameters ####
+## >> Specify covariates with interactions ###
 interaction_terms <- c("X", "Y")
 
-## Specify factor variable
+## >> Specify factor variable ####
 factor_terms <- names(backxyz)[grep("lu", names(backxyz))]
 
-## Define ppm variables to be used in the model 
+
+## >> Define continuous ppm variables to be used in the model ####
 ## NOTE: X, Y & landuse are called in the ppm formula directly, hence removed here
-ppm_terms <- names(backxyzK)[!grepl("off.bias", names(backxyzK))]
+ppm_terms <- names(backxyz)[!grepl("off.bias", names(backxyz))]
 ppm_terms <- ppm_terms[!(ppm_terms %in% interaction_terms)]
 ppm_terms <- ppm_terms[!(ppm_terms %in% factor_terms)]
 
-# ## Fix max.lambda = 100
+
+# ## Fix max.lambda = 100 - SKIP, IS THIS NEEDED? ####
 # lambdaseq <- round(sort(exp(seq(-10, log(max.lambda + 1e-05), length.out = n.fits)), 
 #                         decreasing = TRUE),5)
 
-## Estimate weights - by Skipton Wooley - TO FIX
+
+## >> Estimate weights for background points - SKIP TO FIX/MODIFY ####
 ## See ppmlasso::ppmdat 
 ## To replace with Dirichlet tessalation
 ppmlasso_weights <- function (sp.xy, quad.xy, coord = c("X", "Y")){
@@ -240,7 +235,9 @@ ppmlasso_weights <- function (sp.xy, quad.xy, coord = c("X", "Y")){
                                                   names(round.table))])
 }
 
-## Previously...
+
+## >> Estimate species weights - SKIP TO REVIEW ####
+## (delete/modify/keep/add not to work on this later?)
 # spdat <- gbif
 # species_names <- levels(factor(spdat$species))
 # spwts <- list()
@@ -257,18 +254,7 @@ ppmlasso_weights <- function (sp.xy, quad.xy, coord = c("X", "Y")){
 # }
 
 
-
-# ## Estimate weights for background points - NOT REQUIRED WITH ppmlasso_weights()
-# ## calculate the area of the study area and then 
-# ##  work out the weights based on the total area divided by number of points
-# ar <- raster::area(global_mask0)
-# ar <- mask(ar,global_mask)
-# totarea <- cellStats(ar,'sum')*1000 ## in meters^2
-# area_offset <- extract(ar, backxyzK[,c('X','Y')], small = TRUE, fun = mean, na.rm = TRUE)*1000 ## in meters
-# bkgrd_wts <- c(totarea/area_offset)
-
-
-## Initialise log file for comparing model runtimes ####
+## >> Initialise log file for comparing model runtimes ####
 timelog <- paste0(log_dir, "/ppm_timelog_",Sys.Date(), ".txt")
 writeLines(c(""), timelog)
 cat(paste(c("i", "species_name", "pr_pts", "back_pts",	"ppmfit_0folds_min",	
@@ -277,14 +263,14 @@ cat(paste(c("i", "species_name", "pr_pts", "back_pts",	"ppmfit_0folds_min",
     file = timelog, append = T)
 
 
-## Define model function ####
+## >> Define model function ####
 fit_ppms_apply <- function(i, spdat, bkdat, interaction_terms, 
                            ppm_terms, species_names, mask_path, 
                            n.fits=50, min.obs = 60, 
                            modeval = TRUE, 
                            output_list = FALSE) {
   
-  ## Initialise log file for species
+  ## >> >> Initialise log file for species ####
   cat("Fitting a ppm to", species_names[i],"\nThis is the", i,"^th model of",length(species_names),"\n")
   specieslog <- paste0(log_dir, "/ppm_log_",gsub(" ","_",species_names[i]),"_",gsub("-", "", Sys.Date()), ".txt")
   writeLines(c(""), specieslog)
@@ -294,46 +280,50 @@ fit_ppms_apply <- function(i, spdat, bkdat, interaction_terms,
       file = specieslog, append = T)
   ppm_dat_start <- Sys.time()
   
-  ## Define species specific data & remove NA (if any)
+  ## >> >> Get species specific data ####
   spxy <- spdat[spdat$species %in% species_names[i], c(1,2)]
   names(spxy) <- c("X", "Y")
   
-  # # ## Check if points fall outside the mask
+  # # ## Check if points fall outside the mask - TO REVIEW
+  # ## Decide what to do here: discard or move points
+  # ## This check/fix will be moved to the gbif processing script later
   # plot(global_mask)
   # points(spxy)
+  # 
+  # 
+  # ## Move species occurrence points falling off the mask to nearest 'land' cells
+  # ## First find points which fall in NA areas on/off the raster
+  # global_mask <- raster(mask_path)
+  # vals <- extract(global_mask, spxy)
+  # outside_mask <- is.na(vals)
+  # if(sum(outside_mask) > 0){
+  #   outside_pts <- spxy[outside_mask, ]
+  #   ## find the nearest land within 5 decimal degrees of these
+  #   land <- nearestLand(outside_pts, global_mask, 1000000)
+  #   ## replace points falling in NA with new points on nearest land
+  #   spxy[outside_mask, ] <- land
+  #   ## count how many were moved
+  #   sum(!is.na(land[, 1]))
+  # }
+  # ## Checks
+  # # nrow(unique(outside_pts))
+  # # nrow(unique(land))
+  # ## NOTE: We lose data because number of unique locations is reduced.
   
   
-  ## TO REVIEW. Decide whether to discard ot move. 
-  ## Move species occurrence points falling off the mask to nearest 'land' cells
-  ## First find points which fall in NA areas on/off the raster
-  global_mask <- raster(mask_path)
-  vals <- extract(global_mask, spxy)
-  outside_mask <- is.na(vals)
-  if(sum(outside_mask) > 0){
-    outside_pts <- spxy[outside_mask, ]
-    ## find the nearest land within 5 decimal degrees of these
-    land <- nearestLand(outside_pts, global_mask, 1000000)
-    ## replace points falling in NA with new points on nearest land
-    spxy[outside_mask, ] <- land
-    ## count how many were moved
-    sum(!is.na(land[, 1]))
-  }
-  # ## WARNING: We lose data because number of unique locations is reduced.
-  # nrow(unique(outside_pts))
-  # nrow(unique(land))
+  ## >> >> Extract covariates for species presence points - TO FIX ####
+  ## Too long to run raster funcs, alternative gdal function to extract points from grid
   
-  
-  ## Extract covariates for presence points - TO FIX
-  ## Find alternate functions to speed up extraction
+  ## Extract covariate values excluding land use 
   cov_mod <- rasterFromXYZ(bkdat)
   r <- cov_mod[[-grep("lu", names(cov_mod))]]
   spxy_nolu <- extract(r, spxy,
                        fun = mean, na.rm = TRUE)
-  # ## NOTE: This step takes too long to run ...
+  # ## NOTE: Extracting by buffer takes too long to run ...
   # spxyz_nolu <- extract(r, spxy, buffer = 1000000, small = TRUE, 
   #                       fun = mean, na.rm = TRUE)
   
-  ## For landuse: Take the non-NA value at shortest distance from point
+  ## Extract landuse values: Take the non-NA value at shortest distance from point
   r = cov_mod[[grep("lu", names(cov_mod))]] ## landuse raster
   spxy_lu <- extract(r, spxy, method='simple', na.rm=TRUE, factor = TRUE) 
   ## NOTE: extract(r, spxy, method = 'simple') gives NAs
@@ -342,22 +332,21 @@ fit_ppms_apply <- function(i, spdat, bkdat, interaction_terms,
   # spxy_lu <- apply(X = spxy, MARGIN = 1, FUN = function(X) r@data@values[which.min(replace(distanceFromPoints(r, X), is.na(r), NA))])
   
   spxyz <- cbind(spxy, spxy_lu, spxy_nolu)
-  names(spxyz)[grep("lu", names(spxyz))] <- "landuse"
   spxyz <- na.omit(spxyz)
   
-  ## Check for NAs in data and return error if any
+  ## >> >> Return error if NAs found in data ####
   if (all(is.na(spxyz))) {
     stop("NA values not allowed in model data.")
   }
   
-  ## Check if number of observations for a species is > 20, return NULL
+  ## >> >> Return NULL for species if number of observations < 20 (i.e. do not fit model) ####
   nk <- nrow(spxyz)
   
   if (nk < 20) {
     return(NULL)
   } else {
     
-    ## Build model
+    ## >> >> Build model ####
     ## Add 'Pres' column and calculate weights for PPM data
     ppmxyz <- rbind(cbind(spxyz, Pres = 1),
                     cbind(bkdat, Pres = 0))
@@ -369,18 +358,18 @@ fit_ppms_apply <- function(i, spdat, bkdat, interaction_terms,
     cat(paste("\nRun time for data preparation: ", ppm_dat_end, attr(ppm_dat_end, "units"), "\n"), 
         file = specieslog, append = T)
     
-    ## Specify PPM formula based on number of observatios
+    ## !! Specify PPM formula based on number of observatios - TO FIX ####
     ## If number of observations < 20, do not fit a model.
     ## If number of observations >= 20, fit a model accordig to the followig rule:
     ##  1. If number of observations <= min.obs (default as 60), 
     ##    use only the spatial covariates i.e. lat and long and offset. This gives 6 
     ##    terms: X, Y, X^2, Y^2, X:Y (linear, quadratic with interaction), offset
     ##  2. If number of observations is between min.obs and min.obs+10*, add landuse covariate.
-    ##    *10 as per the one-in-ten rule (see point 3).Factor variables are fit as 1 varible only, 
-    ##    irrespective of the number of levels within 
+    ##    *10 as per the one-in-ten rule (see point 3).Factor variables are fit as 1 variable only, 
+    ##    irrespective of the number of levels within
     ##  3. If number of observatons > min.obs, 
     ##    use the one-in-ten rule (https://en.wikipedia.org/wiki/One_in_ten_rule)
-    ##    where, an additional covariate is added for every 10 additonal obeservations.
+    ##    where, an additional covariate is added for every 10 additonal observations.
     ##    Because we fit poly with degree 2, adding a covariate will add two 
     ##    terms x and x^2 to the model. Therefore, to operationalize this rule, 
     ##    we add 1 raw covariate for every 20 additional observations. 
@@ -388,41 +377,30 @@ fit_ppms_apply <- function(i, spdat, bkdat, interaction_terms,
     
     ## *** ISSUE: There is inherent bias in how covariates are added i.e.
     ##  which covariates are included in the model as they are selected 
-    ##  based on their order in the dataframe; pa being added last.
-    ## *** ISSUE: factor(pa) only included when sufficient obs to fit all variables...
-    ## factor(pa) will need to be changes when use use distance layers
+    ##  based on their order in the dataframe.
     
     if(nk <= min.obs){
+      
       ppmform <- formula(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
                                 ", degree = 2, raw = FALSE) + offset(log(off.bias))",collapse =""))
     } else {
-      if(nk > min.obs & nk <= min.obs + 10){
-        ppmform <- formula(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
-                                  ", degree = 2, raw = FALSE) + ", 
-                                  paste0("factor(", factor_terms, collapse = " + ", ")"), 
-                                  " + offset(log(off.bias))",collapse ="")) 
-      } else {
-        extra_covar <- ceiling((nk - min.obs)/20) ## upto nk = 360 obs
-        if(extra_covar <= length(ppm_terms)) { 
-          ppmform <- formula(paste0(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
-                                           ", degree = 2, raw = FALSE) + factor(landuse)"), 
-                                    paste0(" + poly(", ppm_terms[1:extra_covar],
-                                           ", degree = 2, raw = FALSE)", 
-                                           collapse = ""), " + offset(log(off.bias))" ,
-                                    collapse =""))
-        } else {
-          if(extra_covar > length(ppm_terms)) { ## Fit all covariates + pa
-            extra_covar <- length(ppm_terms)
-            ppmform <- formula(paste0(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
-                                             ", degree = 2, raw = FALSE) + factor(landuse)"), 
-                                      paste0(" + poly(", ppm_terms[1:extra_covar],
-                                             ", degree = 2, raw = FALSE)",
-                                             collapse = ""), " + factor(pa) + offset(log(off.bias))" ,
-                                      collapse =""))
-          }
-        }
-      }
+      
+      ## Fit covariates as per 1-in-10 rule
+      extra_covar <- ceiling((nk - min.obs)/20)
+      extra_covar <- ifelse(extra_covar > length(ppm_terms), length(ppm_terms), extra_covar) 
+      
+      ## !! TO FIX LU VARIABLE - each LU class showing as categorical ####
+      ppmform <- formula(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
+                                       ", degree = 2, raw = FALSE) + ", 
+                                       paste0("factor(", factor_terms, collapse = " + ", ")"),  
+                                       paste0(" + poly(", ppm_terms[1:extra_covar],
+                                              ", degree = 2, raw = FALSE)",
+                                              collapse = ""), " + offset(log(off.bias))" ,
+                                       collapse =""))
     }
+  }
+}
+
     
     ## Fit ppm & save output
     cat(paste("\nFitting ppm model for species ",i , ": ", spp[i], " @ ", Sys.time(), "\n"), 
@@ -638,11 +616,6 @@ fit_ppms_apply <- function(i, spdat, bkdat, interaction_terms,
   }
 }
 
-## Log run time
-model_prep_runtime <- Sys.time()-model_prep_start
-cat(paste0("Model prep stop = ", Sys.time(), "\n"), file = masterlog, append = TRUE)
-cat(paste0(">> Model prep runtime = ", model_prep_runtime, " ",
-           attr(model_prep_runtime, "units"), "\n"), file = masterlog, append = TRUE)
 
 
 

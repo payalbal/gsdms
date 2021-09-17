@@ -282,6 +282,9 @@ file.rename(paste0(file.path(ludir, basename(tools::file_path_sans_ext(landuse))
             file.path(ludir,"ESA_landuse.tif"))
 file.remove(landuse)
 
+## Updated data: https://lcviewer.vito.be/download
+
+
   # ## Alternative source (fractional data): Copernicus data
   # ## ------- reclassify, resample, download by tile and stich tiles
   # ## Link @ GEE: https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V_Global

@@ -39,7 +39,7 @@ if(!dir.exists(output_dir)) {
 #           copy.mode = TRUE, copy.date = TRUE)
 
 ## Functions
-# source("/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/scripts/0_functions.R")
+source("/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/scripts/0_functions.R")
 source("/home/payalb/gsdms_r_vol/tempdata/workdir/landuse_projects/land-use/gdal_calc.R") # by jgarber
   # ## To pull directly from jgarber's repo:
   # library(RCurl)
@@ -543,28 +543,6 @@ dat <- as.data.table(na.omit(cbind(mask_pts, as.matrix(dat))))
 
 
 ## >> Test for correlations in covariates ####
-## Author: Simon Kapitza
-correlations <- function(covs, thresh = 0.7, N = 50000) {
-  subs_cor <- sample(1:nrow(covs), size = N) # subset covs to calculate correlations
-  cors <- cor(covs[subs_cor, ], method = "spearman")
-  while (min(abs(cors[abs(cors) >= thresh])) != 1){
-    values <- cors[which(abs(cors) > thresh)]
-    # corellated <- which(abs(cors) > thresh)
-    values[values ==1] <- NA
-    # corellated[which(values== max(values, na.rm = T))]
-    rows_highest_cor <- which(cors == max(values, na.rm = T), arr.ind = T)[,1]
-    cors_cur <- abs(cors[rows_highest_cor,])
-    '%ni%' <- Negate('%in%')
-    m1 <- max(cors_cur[1,][cors_cur[1,]%ni%c(max(values, na.rm = T),1)])
-    m2 <- max(cors_cur[2,][cors_cur[2,]%ni%c(max(values, na.rm = T),1)])
-    out <- ifelse(m1 > m2, 1, 2)
-    cors <- cors[-which(colnames(cors) == names(rows_highest_cor)[out]), 
-                 -which(colnames(cors) == names(rows_highest_cor)[out])]
-    nrow(cors)
-  }
-  return(cors)
-}
-
 preds <- colnames(correlations(dat, thresh = 0.7, N = 200000))
 preds <- sub("_current_", "", preds)
 write.csv(preds, file.path(output_dir, "uncorrelated_covs.csv"), 
