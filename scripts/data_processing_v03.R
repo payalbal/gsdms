@@ -10,13 +10,12 @@ gc()
 # system("ps")
 # system("pkill -f R")
 
-mc.cores = detectCores()-2
-
 # devtools::install_github('skiptoniam/sense')
 x <- c('data.table', 'sp', 'raster', 
        'rgdal', 'sense', 'tools', 'bitops', 
        'RCurl', 'gdalUtils', 'usethis',
-       'parallel', 'doMC')
+       'parallel', 'doMC',
+       'reticulate')
 lapply(x, require, character.only = TRUE)
 rm(x)
 
@@ -137,93 +136,112 @@ system(paste0("gdal_calc.py -A ", landuse,
 gdalUtils::gdalinfo(outfile)
 
 
-## >> step two_clip by e ####
-infile = outfile
-outfile = file.path(output_dir, paste0(tools::file_path_sans_ext(basename(infile)), "_clip.", tools::file_ext(infile)))
-outfile = gsub("\\..*", ".tif", outfile)
-new_extent <- "-180 -60 180 90"
-
-system(paste0("gdalwarp -overwrite -ot Byte",
-              " -te ", new_extent, " ",
-              infile, " ", outfile))
+## >> step two_change NoData values to -9999 ####
+change_values = "/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/scripts/change_values.sh"
+system(paste0("bash ", change_values, " ", outfile, " -9999"))
+gdalUtils::gdalinfo(gsub(".tif", "_edt.tif", outfile))
+file.copy(gsub(".tif", "_edt.tif", outfile), file.path(output_dir, "ESA_landuse_reclass.tif"))
+file.remove(c(gsub(".tif", "_edt.tif", outfile), gsub(".tif", "_temp.tif", outfile)))
 
 
 ## >> step three_create separate tif for each landuse class ####
-infile <- outfile
-gdalUtils::gdalinfo(infile)
-## get unique values: https://gis.stackexchange.com/questions/33388/python-gdal-get-unique-values-in-discrete-valued-raster
-## run python code: https://rstudio.github.io/reticulate/
-
+## NOTES: get unique values: https://gis.stackexchange.com/questions/33388/python-gdal-get-unique-values-in-discrete-valued-raster
+## NOTES: run python code: https://rstudio.github.io/reticulate/
+infile <- file.path(output_dir, "ESA_landuse_reclass.tif")
 vals <- 1:9
 class <- c("crop", "crop_mosaic", "forest", "grass", 
            "shrub", "wetland", "urban", "other", "water")
-
-outfile <- file.path(output_dir, paste0("lu", vals, class))
+outfile <- file.path(output_dir, paste0("lu", vals, class, ".tif"))
 
 parallel::mclapply(seq_along(vals),
                    function(x) system(paste0("gdal_calc.py -A ", infile,
                                              " --calc='((A==", x, "))*1 + (",
                                              paste0("(A==", vals[-x], ")",
                                                     collapse = " + "),
-                                             ")*0' --NoDataValue=0",
+                                             ")*0' --NoDataValue=-9999",
                                              " --outfile=", outfile[x])),
-                   mc.cores = mc.cores, mc.preschedule = TRUE)
-
-system(paste0("gdal_calc.py -A ", infile,
-              " --calc='((A==", j, "))*1 + (", paste0("(A==", vals[-j], ")", collapse = " + "), ")*0' --NoDataValue=0",
-              " --outfile=", outfile))
-gdalUtils::gdalinfo(outfile)
-
-# system(paste0("gdal_calc.py -A ", infile,
-#               " --calc='((A==1))*1 + ((A==0) + (A==2) + (A==3) + (A==4) + (A==5) + (A==6) + (A==7) + (A==8) + (A==9))*0' --NoDataValue=0",
-#               " --outfile=", outfile))
+                   mc.cores = length(vals), mc.preschedule = TRUE)
+gdalUtils::gdalinfo(outfile[3])
 
 
+## >> step four_clip by e ####
+infile <- outfile
+outfile <- gsub(".tif", "_clip.tif", infile)
+outfile = gsub("\\..*", ".tif", outfile)
+new_extent <- "-180 -60 180 90"
 
-## >> step three_reproject: Equal Earth ####
+parallel::mclapply(seq_along(vals),
+                   function(x) system(paste0("gdalwarp -overwrite -ot Byte",
+                                             " -te ", new_extent, " ",
+                                             infile[x], " ", outfile[x])),
+                   mc.cores = length(vals), mc.preschedule = TRUE)
+
+# system(paste0("gdalwarp -overwrite -ot Byte",
+#               " -te ", new_extent, " ",
+#               infile, " ", outfile))
+gdalUtils::gdalinfo(outfile[4])
+
+
+## >> step five_create fractional layers & reproject to Equal Earth ####
 ## resamplig method: near (https://support.esri.com/en/technical-article/000005606)
-
 ## see: https://gis.stackexchange.com/questions/352476/bilinear-resampling-with-gdal-leaves-holes
-
 infile <- outfile #list.files(output_dir, pattern = "_clip", full.names = TRUE)
-outfile <- gsub("_clip", "_ee", infile)
+outfile <- gsub("_clip.tif", "_frac.tif", infile)
 new_res <- c(10000,10000)
 new_crs = '+proj=eqearth +ellips=WGS84 +wktext'
 wgs_crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" 
 
-system(paste0("gdalwarp -overwrite -ot Byte -r near -tr ",
+# parallel::mclapply(seq_along(vals),
+#                    function(x) system(paste0("gdalwarp -overwrite -ot Byte -r average -tr ",
+#                                              paste(new_res, collapse = " "),
+#                                              " -s_srs '", wgs_crs, "'",
+#                                              " -t_srs '", new_crs, "' ",
+#                                              infile[x], " ", outfile[x])),
+#                    mc.cores = length(vals), mc.preschedule = TRUE)
+
+system(paste0("gdalwarp -overwrite -ot Byte -r average -tr ",
               paste(new_res, collapse = " "),
               " -s_srs '", wgs_crs, "'",
               " -t_srs '", new_crs, "' ",
-              infile, " ", outfile))
+              infile[1], " ", outfile[1]))
 
-sort(unique(values(raster(outfile))))
+gdalUtils::gdalinfo(outfile[1])
+sort(unique(values(raster(outfile[1]))))
+range(unique(values(raster(outfile[4]))), na.rm = TRUE)
 file.remove(infile)
 
-## >> step four_clip: to make #cells equal between mask and layer ####
-infile <- outfile
-outfile <- sub("_ee", "_clip2", outfile)
-mask_file <- file.path(output_dir, "globalmask_10k_ee.tif")
-new_extent <- extent(raster(mask_file))
 
-system(paste0("gdalwarp -overwrite -ot Byte -te ",
-              paste(new_extent[1], new_extent[3],
-                    new_extent[2], new_extent[4]), " ",
-              infile, " ", outfile))
-file.remove(infile)
 
-## >> step five_mask ####
+# ## >> step six_clip: to make #cells equal between mask and layer ####
+# infile <- outfile
+# outfile <- sub("_ee", "_clip2", outfile)
+# mask_file <- file.path(output_dir, "globalmask_10k_ee.tif")
+# new_extent <- extent(raster(mask_file))
+# 
+# system(paste0("gdalwarp -overwrite -ot Byte -te ",
+#               paste(new_extent[1], new_extent[3],
+#                     new_extent[2], new_extent[4]), " ",
+#               infile, " ", outfile))
+# file.remove(infile)
+
+
+## >> step six_mask ####
 ## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R
 infile <- outfile
-outfile <- sub("_clip2", "_eqar", outfile)
+outfile <- sub("_ee", "_eqar", outfile)
 mask_file <- file.path(output_dir, "globalmask_10k_ee.tif")
 
 gdalUtils::gdalinfo(mask_file)
-system(paste0("gdal_calc.py -A ", infile, " -B ", mask_file,
-              " --calc='((B==1)*A)+(-9999*(B!=1))' --NoDataValue=-9999",
-              " --outfile=", outfile))
-gdalUtils::gdalinfo(outfile)
+parallel::mclapply(seq_along(vals),
+                   function(x) system(paste0("gdal_calc.py -A ", infile[x], 
+                                             " -B ", mask_file,
+                                             " --calc='((B==1)*A) + (-9999*(B!=1))' --NoDataValue=-9999",
+                                             " --outfile=", outfile[x])),
+                   mc.cores = length(vals), mc.preschedule = TRUE)
+gdalUtils::gdalinfo(outfile[3])
 file.remove(infile)
+
+
 
 # ## >> Source: Copernicus (fractional land use) ####
 # ## Link @ GEE: https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V_Global
