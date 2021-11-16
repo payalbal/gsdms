@@ -846,5 +846,5 @@ for (i in 1:length(error_models)){
   }else{
     print(paste0("Model ",i, " for '", spp[i], "' has errors"))
     cat(paste(i, ",", spp[i], "\n"),
-        file = errorfile, append = T)
+        file = errorfile, append = T)zoom
     err

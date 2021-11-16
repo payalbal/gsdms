@@ -283,9 +283,15 @@ file.rename(paste0(file.path(ludir, basename(tools::file_path_sans_ext(landuse))
 file.remove(landuse)
 
 
-  # ## Alternative source (fractional data): Copernicus data
+## OR https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V-C3_Global
+
+## OR https://data.pnnl.gov/group/nodes/dataset/13192
+
+
+
+  # ## Alternative source (discreet): Copernicus data
   # ## ------- reclassify, resample, download by tile and stich tiles
-  # ## Link @ GEE: https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V_Global
+  # ## Link @ GEE: https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V_Global (updated)
   # ## Direct download link: https://zenodo.org/communities/copernicus-land-cover/search?page=1&size=20
   # ## Data viewer: https://lcviewer.vito.be/download
   # ## Data processing for global layer @ GEE by MC Loor: https://code.earthengine.google.com/?scriptPath=users%2Fpayalbal%2Fglobal_layers%3Afraclu_mcloor_sklu. See processing in GEE for reclassification scheme.
@@ -324,7 +330,7 @@ file.remove(landuse)
   # ... [follow up with CW for single fractional LU map with 12 classes]
   
 
-  # ## Alternative source (discrete data): Copernicus land use data
+  # ## Alternative source (discrete data 2015 only): Copernicus land use data
   # ## source: https://land.copernicus.eu/global/content/release-global-100m-land-cover-maps-2015
   # ## https://zenodo.org/communities/copernicus-land-cover/search?page=1&size=20
   # ## https://zenodo.org/record/3243509#.XiU6d1MzbOQ

@@ -10,9 +10,27 @@ gc()
 # system("ps")
 # system("pkill -f R")
 
+## Ensure ncdf4{} works
+## In terminal ssh into ubuntu@global-diversity/or in R terminal
+## type nc-config --libs
+Sys.getenv()
+Sys.getenv("LD_LIBRARY_PATH")
+Sys.setenv(LD_LIBRARY_PATH = paste(Sys.getenv("LD_LIBRARY_PATH"), "/usr/lib/x86_64-linux-gnu", "/usr/lib/x86_64-linux-gnu/hdf5/serial", sep = ":"))
+
+## Install processNC{}
+## https://github.com/RS-eco/processNC
+if(!"remotes" %in% installed.packages()[,"Package"]) install.packages("remote")
+if(!"processNC" %in% installed.packages()[,"Package"]) remotes::install_github("RS-eco/processNC", build_vignettes=T)
+
+## cdo 
+## https://code.mpimet.mpg.de/projects/cdo/
+
+
+## Load libraries
 # devtools::install_github('skiptoniam/sense')
 x <- c('data.table', 'sp', 'raster', 
        'rgdal', 'sense', 'tools', 'bitops', 
+       'ncdf4', 'processNC',
        'RCurl', 'gdalUtils', 'usethis',
        'parallel', 'doMC',
        'reticulate')
@@ -121,13 +139,13 @@ file.remove(outfile)
 ## ----------------------------------------------------------------------------- ## 
 
 ## Land use 
-## >> Source: ESA (fractional land use) ####
+## >> I. Source: ESA (fractional land use) ####
 ## http://maps.elie.ucl.ac.be/CCI/viewer/download.php 
 landuse <- list.files("/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse/CCI",
                       pattern = "landuse.tif$", full.names = TRUE)
 outfile <- gsub("ESA_landuse", "ESA_landuse_reclass", landuse)
 
-## >> step one_reclassify ####
+## >> >> step one_reclassify ####
 ## Recalssify according to flutes classes - See landuse_classifications.xlsx
 gdalUtils::gdalinfo(landuse)
 system(paste0("gdal_calc.py -A ", landuse,
@@ -136,7 +154,7 @@ system(paste0("gdal_calc.py -A ", landuse,
 gdalUtils::gdalinfo(outfile)
 
 
-## >> step two_change NoData values to -9999 ####
+## >> >> step two_change NoData values to -9999 ####
 change_values = "/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/scripts/change_values.sh"
 system(paste0("bash ", change_values, " ", outfile, " -9999"))
 gdalUtils::gdalinfo(gsub(".tif", "_edt.tif", outfile))
@@ -144,7 +162,7 @@ file.copy(gsub(".tif", "_edt.tif", outfile), file.path(output_dir, "ESA_landuse_
 file.remove(c(gsub(".tif", "_edt.tif", outfile), gsub(".tif", "_temp.tif", outfile)))
 
 
-## >> step three_create separate tif for each landuse class ####
+## >> >> step three_create separate tif for each landuse class ####
 ## NOTES: get unique values: https://gis.stackexchange.com/questions/33388/python-gdal-get-unique-values-in-discrete-valued-raster
 ## NOTES: run python code: https://rstudio.github.io/reticulate/
 infile <- file.path(output_dir, "ESA_landuse_reclass.tif")
@@ -161,10 +179,10 @@ parallel::mclapply(seq_along(vals),
                                              ")*0' --NoDataValue=-9999",
                                              " --outfile=", outfile[x])),
                    mc.cores = length(vals), mc.preschedule = TRUE)
-gdalUtils::gdalinfo(outfile[3])
+gdalUtils::gdalinfo(outfile[1])
 
 
-## >> step four_clip by e ####
+## >> >> step four_clip by e ####
 infile <- outfile
 outfile <- gsub(".tif", "_clip.tif", infile)
 outfile = gsub("\\..*", ".tif", outfile)
@@ -179,10 +197,22 @@ parallel::mclapply(seq_along(vals),
 # system(paste0("gdalwarp -overwrite -ot Byte",
 #               " -te ", new_extent, " ",
 #               infile, " ", outfile))
-gdalUtils::gdalinfo(outfile[4])
+gdalUtils::gdalinfo(outfile[1])
 
 
-## >> step five_create fractional layers & reproject to Equal Earth ####
+
+## >> >> step five_create fractional layers at 0.1 degrees (= ~10k) ####
+## >> >> -- NOT WORKING -- ####
+infile <- outfile
+outfile <- gsub("_clip.tif", "_frac.tif", infile)
+new_res <- c(0.1, 0.1)
+
+system(paste0("gdalwarp -overwrite -r average -tr ",
+              paste(new_res, collapse = " "), " ",
+              infile[1], " ", outfile[1]))
+
+
+## >> >> step six_reproject to Equal Earth ####
 ## resamplig method: near (https://support.esri.com/en/technical-article/000005606)
 ## see: https://gis.stackexchange.com/questions/352476/bilinear-resampling-with-gdal-leaves-holes
 infile <- outfile #list.files(output_dir, pattern = "_clip", full.names = TRUE)
@@ -199,20 +229,17 @@ wgs_crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 #                                              infile[x], " ", outfile[x])),
 #                    mc.cores = length(vals), mc.preschedule = TRUE)
 
-system(paste0("gdalwarp -overwrite -ot Byte -r average -tr ",
+system(paste0("gdalwarp -overwrite -r average -tr ",
               paste(new_res, collapse = " "),
-              " -s_srs '", wgs_crs, "'",
               " -t_srs '", new_crs, "' ",
               infile[1], " ", outfile[1]))
 
-gdalUtils::gdalinfo(outfile[1])
+gdalUtils::gdalinfo(infile[1])
 sort(unique(values(raster(outfile[1]))))
-range(unique(values(raster(outfile[4]))), na.rm = TRUE)
+range(unique(values(raster(outfile[1]))), na.rm = TRUE)
 file.remove(infile)
 
-
-
-# ## >> step six_clip: to make #cells equal between mask and layer ####
+# ## >> >> step_clip: to make #cells equal between mask and layer ####
 # infile <- outfile
 # outfile <- sub("_ee", "_clip2", outfile)
 # mask_file <- file.path(output_dir, "globalmask_10k_ee.tif")
@@ -225,7 +252,7 @@ file.remove(infile)
 # file.remove(infile)
 
 
-## >> step six_mask ####
+## >> >> step seven_mask ####
 ## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R
 infile <- outfile
 outfile <- sub("_ee", "_eqar", outfile)
@@ -243,7 +270,7 @@ file.remove(infile)
 
 
 
-# ## >> Source: Copernicus (fractional land use) ####
+# ## >> II. Source: Copernicus (fractional land use) ####
 # ## Link @ GEE: https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V_Global
 # ## Direct download link: https://zenodo.org/communities/copernicus-land-cover/search?page=1&size=20
 # ## Data processing for global layer @ GEE co-authored by MC Loor: https://code.earthengine.google.com/?scriptPath=users%2Fpayalbal%2Fglobal_layers%3Afraclu_sklu. See processing in GEE for reclassification scheme.
@@ -292,6 +319,89 @@ file.remove(infile)
 # lu5 <- file.path(file.path(data_dir, "copernicus", "landuse_class5.tif"))
 # landuse <- c(lu1, lu2, lu3, lu4, lu5)
 
+
+
+## >> III. Source: LUH2 Hurtt data ####
+##
+
+hurtt_out <- file.path(data_dir, "landuse/hurtt_processing")
+if(!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
+infile <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse/Hurtt/ssp5-rcp85_2015-2100.nc"
+gdalUtils::gdalinfo(infile)
+
+lu <- nc_open(infile, write=FALSE, readunlim=FALSE, 
+              verbose=FALSE,auto_GMT=TRUE, 
+              suppress_dimvals=FALSE)
+
+names(lu)
+names(lu$var)
+names(lu$var$primf)
+str(lu$var$primf)
+
+lu$var$primf$missval
+ncvar_change_missval(primf.86, ...) 
+## Remember we have to open the file as writable to be able to change
+## the missing value on disk!
+
+primf.86 <- ncvar_get(lu, varid = "primf", 
+                   start = NA, count = NA, 
+                   verbose=FALSE,
+                   signedbyte=TRUE, 
+                   collapse_degen=TRUE, 
+                   raw_datavals=TRUE )
+
+typeof(primf.86); class(primf.86); str(primf.86); sum(is.na(primf.86))
+dim(primf.86)
+
+primf <- raster::brick(primf.86)
+
+## Change missign values to NA
+primf[[1]]
+primf[primf == lu$var$primf$missval] <- NA
+primf[[1]]
+
+## Set extent
+extent(primf) <-  c(-180, 180, -90, 90)
+
+## Rotate rasters
+primf_flip <- t(flip(primf_reproj[[1]], direction='y' ))
+plot(primf_flip)
+
+## Reproject rasters
+crs(primf) <- "+proj=longlat +datum=WGS84 +no_defs"
+primf_reproj <- projectRaster(primf, crs = "+proj=eqearth +ellips=WGS84 +wktext")
+
+plot(primf[[1]])
+plot(primf_reproj[[1]])
+
+mask_file <- file.path(output_dir, "globalmask_wgs_1degree.tif")
+raster(mask_file)
+
+primf.2015 <- primf[[1]]
+primf.2100 <- primf[[86]]
+
+r <- raster(nrows = 1440, ncols = 720,
+            xmn=-180, xmx=180, ymn=-90, ymx=90,
+            crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0", 
+            resolution = c(0.25, 0.25), 
+            vals=NULL)
+
+r[] <- getValues(raster(primf.86[ , ,1]))
+
+
+
+## Cdo operations...
+system(paste0("cdo -sinfo ", infile))
+system(paste0("cdo -showname ", infile))
+system(paste0("cdo -ntime ", infile))
+system(paste0("cdo -griddes ", infile))
+
+outfile <- file.path(hurtt_out, "temp.nc")
+system(paste0("cdo -chname, lat_bounds, bounds_lat ", infile, " ", outfile))
+
+system(paste0("ncrename -d time_bnds,bounds_time -d lat_bounds,bounds_lat -d lon_bounds,bounds_lon -v time_bnds,bounds_time -v lat_bounds,bounds_lat -v lon_bounds,bounds_lon ", infile, " ", outfile))
 
 
 ## --------------------------------------------------------------------------- ##
