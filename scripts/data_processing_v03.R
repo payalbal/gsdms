@@ -69,6 +69,10 @@ source("/home/payalb/gsdms_r_vol/tempdata/workdir/landuse_projects/land-use/gdal
 
 
 
+## Net CDF files ####
+system("bash /tempdata/workdir/gsdms/scripts/test.sh")
+
+
 ## ------------------------- ##
 ## Create mask ####
 ## ------------------------- ##
