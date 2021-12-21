@@ -19,7 +19,7 @@ Sys.setenv(LD_LIBRARY_PATH = paste(Sys.getenv("LD_LIBRARY_PATH"), "/usr/lib/x86_
 
 ## Install processNC{}
 ## https://github.com/RS-eco/processNC
-if(!"remotes" %in% installed.packages()[,"Package"]) install.packages("remote")
+if(!"remotes" %in% installed.packages()[,"Package"]) install.packages("remotes")
 if(!"processNC" %in% installed.packages()[,"Package"]) remotes::install_github("RS-eco/processNC", build_vignettes=T)
 
 ## cdo 
@@ -39,7 +39,7 @@ rm(x)
 
 ## Folder paths
 data_dir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data"
-output_dir <- file.path(data_dir, "processed_data_10k")
+output_dir <- file.path(data_dir, "outputs", "layers_10k")
 if(!dir.exists(output_dir)) {
   dir.create(output_dir)
 }
@@ -67,10 +67,6 @@ source("/home/payalb/gsdms_r_vol/tempdata/workdir/landuse_projects/land-use/gdal
 # url <- "https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons.git"
 # devtools::install_git(url = url)
 
-
-
-## Net CDF files ####
-system("bash /tempdata/workdir/gsdms/scripts/test.sh")
 
 
 ## ------------------------- ##
@@ -142,139 +138,298 @@ file.remove(outfile)
 ## Processing CATEGORICAL covariate layers (land use) - Equal Area projection ####
 ## ----------------------------------------------------------------------------- ## 
 
-## Land use 
-## >> I. Source: ESA (fractional land use) ####
-## http://maps.elie.ucl.ac.be/CCI/viewer/download.php 
-landuse <- list.files("/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse/CCI",
-                      pattern = "landuse.tif$", full.names = TRUE)
-outfile <- gsub("ESA_landuse", "ESA_landuse_reclass", landuse)
+## >> I. Source: LUH2 Hurtt data ####
+## 2015 - 2100 (86 time steps)
+## FOR LATER: Convert python script to function using reticulate
 
-## >> >> step one_reclassify ####
-## Recalssify according to flutes classes - See landuse_classifications.xlsx
-gdalUtils::gdalinfo(landuse)
-system(paste0("gdal_calc.py -A ", landuse,
-              " --calc='((A==10) + (A==11) + (A==12) + (A==20) + (A==30))*1 + ((A==40))*2 + ((A==50) + (A==60) + (A==61) + (A==62) + (A==70) + (A==71) + (A==72) + (A==80) + (A==81) + (A==82) + (A==90) + (A==100) + (A==160) + (A==170))*3 + ((A==110) + (A==130))*4 + ((A==120) + (A==121) + (A==122))*5 + ((A==180))*6 + ((A==190))*7 + ((A==140) + (A==150) + (A==151) + (A==152) + (A==153) + (A==200) + (A==201) + (A==202) + (A==220))*8 + ((A==210))*9' --NoDataValue=0",
-              " --outfile=", outfile))
-gdalUtils::gdalinfo(outfile)
+hurtt_out <- file.path(data_dir, "outputs", "hurtt")
+if(!dir.exists(hurtt_out)) {
+  dir.create(hurtt_out)
+}
 
+## SSP input files
+infiles = list.files(file.path(data_dir, "landuse/Hurtt"), 
+                     pattern = ".nc$", full.names = TRUE)
 
-## >> >> step two_change NoData values to -9999 ####
-change_values = "/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/scripts/change_values.sh"
-system(paste0("bash ", change_values, " ", outfile, " -9999"))
-gdalUtils::gdalinfo(gsub(".tif", "_edt.tif", outfile))
-file.copy(gsub(".tif", "_edt.tif", outfile), file.path(output_dir, "ESA_landuse_reclass.tif"))
-file.remove(c(gsub(".tif", "_edt.tif", outfile), gsub(".tif", "_temp.tif", outfile)))
+## Time steps
+t.all <- seq(2015, 2100, 1)
+t.steps <- seq(2015, 2070, 5)
+t.idx <- which(t.all %in% t.steps)
 
+## Land use variable names
+gdalUtils::gdalinfo(infiles[1])
+lu <- ncdf4::nc_open(infiles[1], write=FALSE, readunlim=FALSE, 
+                     verbose=FALSE,auto_GMT=TRUE, 
+                     suppress_dimvals=FALSE)
+names(lu)
+luvars = names(lu$var)
+luvars = luvars[1:12]
 
-## >> >> step three_create separate tif for each landuse class ####
-## NOTES: get unique values: https://gis.stackexchange.com/questions/33388/python-gdal-get-unique-values-in-discrete-valued-raster
-## NOTES: run python code: https://rstudio.github.io/reticulate/
-infile <- file.path(output_dir, "ESA_landuse_reclass.tif")
-vals <- 1:9
-class <- c("crop", "crop_mosaic", "forest", "grass", 
-           "shrub", "wetland", "urban", "other", "water")
-outfile <- file.path(output_dir, paste0("lu", vals, class, ".tif"))
+  # ## Output file names
+  # outpath = '/tempdata/research-cifs/uom_data/gsdms_data/outputs/hurtt/'
+  # temp = c()
+  # outfiles = c()
+  # 
+  # for ( x in infiles ) {
+  #   for ( y in luvars ) {
+  #     for ( t in t.idx ) {
+  #       temp <- paste0(outpath, gsub("_2015-2100", "", basename(x)), "_", y, "_t", t.all[t], ".nc")
+  #       outfiles <- c(outfiles, temp)
+  #     }
+  #   }
+  # }
+  # 
+  # rm(temp, temp1, x, y, t)
+  # 
+  # ## Check
+  # length(outfiles) == length(infiles) * length(luvars) * length(t.idx)
 
-parallel::mclapply(seq_along(vals),
-                   function(x) system(paste0("gdal_calc.py -A ", infile,
-                                             " --calc='((A==", x, "))*1 + (",
-                                             paste0("(A==", vals[-x], ")",
-                                                    collapse = " + "),
-                                             ")*0' --NoDataValue=-9999",
-                                             " --outfile=", outfile[x])),
-                   mc.cores = length(vals), mc.preschedule = TRUE)
-gdalUtils::gdalinfo(outfile[1])
+## Run oythonn processing script
+system("bash /tempdata/workdir/gsdms/scripts/run_python_processing.sh")
+length(list.files(hurtt_out))
 
-
-## >> >> step four_clip by e ####
-infile <- outfile
-outfile <- gsub(".tif", "_clip.tif", infile)
-outfile = gsub("\\..*", ".tif", outfile)
-new_extent <- "-180 -60 180 90"
-
-parallel::mclapply(seq_along(vals),
-                   function(x) system(paste0("gdalwarp -overwrite -ot Byte",
-                                             " -te ", new_extent, " ",
-                                             infile[x], " ", outfile[x])),
-                   mc.cores = length(vals), mc.preschedule = TRUE)
-
-# system(paste0("gdalwarp -overwrite -ot Byte",
-#               " -te ", new_extent, " ",
-#               infile, " ", outfile))
-gdalUtils::gdalinfo(outfile[1])
+## Check files
+x <- '/tempdata/research-cifs/uom_data/gsdms_data/outputs/hurtt/ssp5-rcp85_urban_t1.nc'
+raster(x)
+plot(raster(x))
 
 
 
-## >> >> step five_create fractional layers at 0.1 degrees (= ~10k) ####
-## >> >> -- NOT WORKING -- ####
-infile <- outfile
-outfile <- gsub("_clip.tif", "_frac.tif", infile)
-new_res <- c(0.1, 0.1)
 
-system(paste0("gdalwarp -overwrite -r average -tr ",
-              paste(new_res, collapse = " "), " ",
-              infile[1], " ", outfile[1]))
+temp <- ncdf4::nc_open(x, write=FALSE, readunlim=FALSE, 
+                       verbose=FALSE,auto_GMT=TRUE, 
+                       suppress_dimvals=FALSE)
+temp2 <- ncvar_get(temp, varid = "primf", 
+                      start = NA, count = NA, 
+                      verbose=FALSE,
+                      signedbyte=TRUE, 
+                      collapse_degen=TRUE, 
+                      raw_datavals=TRUE )
+
+temp2 <- raster(temp2)
+crs(temp2) <- "+proj=longlat +datum=WGS84 +no_defs"
+temp3 <- projectRaster(temp2, crs = "+proj=eqearth +ellips=WGS84 +wktext")
+
+plot(t(temp3))
 
 
-## >> >> step six_reproject to Equal Earth ####
-## resamplig method: near (https://support.esri.com/en/technical-article/000005606)
-## see: https://gis.stackexchange.com/questions/352476/bilinear-resampling-with-gdal-leaves-holes
-infile <- outfile #list.files(output_dir, pattern = "_clip", full.names = TRUE)
-outfile <- gsub("_clip.tif", "_frac.tif", infile)
-new_res <- c(10000,10000)
-new_crs = '+proj=eqearth +ellips=WGS84 +wktext'
-wgs_crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" 
 
+
+
+
+
+infile <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse/Hurtt/ssp5-rcp85_2015-2100.nc"
+gdalUtils::gdalinfo(infile)
+
+lu <- ncdf4::nc_open(infile, write=FALSE, readunlim=FALSE, 
+              verbose=FALSE,auto_GMT=TRUE, 
+              suppress_dimvals=FALSE)
+
+names(lu)
+names(lu$var)
+names(lu$var$primf)
+str(lu$var$primf)
+
+lu$var$primf$missval
+ncvar_change_missval(primf.86, ...) 
+## Remember we have to open the file as writable to be able to change
+## the missing value on disk!
+
+primf.86 <- ncvar_get(lu, varid = "primf", 
+                      start = NA, count = NA, 
+                      verbose=FALSE,
+                      signedbyte=TRUE, 
+                      collapse_degen=TRUE, 
+                      raw_datavals=TRUE )
+
+typeof(primf.86); class(primf.86); str(primf.86); sum(is.na(primf.86))
+dim(primf.86)
+
+primf <- raster::brick(primf.86)
+
+## Change missign values to NA
+primf[[1]]
+primf[primf == lu$var$primf$missval] <- NA
+primf[[1]]
+
+## Set extent
+# extent(primf[[1]]) <-  c(-180, 180, -90, 90)
+
+
+## Reproject rasters
+crs(primf) <- "+proj=longlat +datum=WGS84 +no_defs"
+primf_reproj <- projectRaster(primf[[1]], crs = "+proj=eqearth +ellips=WGS84 +wktext")
+
+## Rotate rasters
+primf_flip <- t(flip(primf_reproj[[1]], direction='y' ))
+plot(primf_flip)
+
+
+plot(primf[[1]])
+plot(primf_reproj[[1]])
+
+mask_file <- file.path(output_dir, "globalmask_wgs_1degree.tif")
+raster(mask_file)
+
+primf.2015 <- primf[[1]]
+primf.2100 <- primf[[86]]
+
+r <- raster(nrows = 1440, ncols = 720,
+            xmn=-180, xmx=180, ymn=-90, ymx=90,
+            crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0", 
+            resolution = c(0.25, 0.25), 
+            vals=NULL)
+
+r[] <- getValues(raster(primf.86[ , ,1]))
+
+
+
+## Cdo operations...
+system(paste0("cdo -sinfo ", infile))
+system(paste0("cdo -showname ", infile))
+system(paste0("cdo -ntime ", infile))
+system(paste0("cdo -griddes ", infile))
+
+outfile <- file.path(hurtt_out, "temp.nc")
+system(paste0("cdo -chname, lat_bounds, bounds_lat ", infile, " ", outfile))
+
+system(paste0("ncrename -d time_bnds,bounds_time -d lat_bounds,bounds_lat -d lon_bounds,bounds_lon -v time_bnds,bounds_time -v lat_bounds,bounds_lat -v lon_bounds,bounds_lon ", infile, " ", outfile))
+
+
+
+
+# ## >> II. Source: ESA (fractional land use) ####
+# ## http://maps.elie.ucl.ac.be/CCI/viewer/download.php 
+# landuse <- list.files("/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse/CCI",
+#                       pattern = "landuse.tif$", full.names = TRUE)
+# outfile <- gsub("ESA_landuse", "ESA_landuse_reclass", landuse)
+# 
+# ## >> >> step one_reclassify ####
+# ## Recalssify according to flutes classes - See landuse_classifications.xlsx
+# gdalUtils::gdalinfo(landuse)
+# system(paste0("gdal_calc.py -A ", landuse,
+#               " --calc='((A==10) + (A==11) + (A==12) + (A==20) + (A==30))*1 + ((A==40))*2 + ((A==50) + (A==60) + (A==61) + (A==62) + (A==70) + (A==71) + (A==72) + (A==80) + (A==81) + (A==82) + (A==90) + (A==100) + (A==160) + (A==170))*3 + ((A==110) + (A==130))*4 + ((A==120) + (A==121) + (A==122))*5 + ((A==180))*6 + ((A==190))*7 + ((A==140) + (A==150) + (A==151) + (A==152) + (A==153) + (A==200) + (A==201) + (A==202) + (A==220))*8 + ((A==210))*9' --NoDataValue=0",
+#               " --outfile=", outfile))
+# gdalUtils::gdalinfo(outfile)
+# 
+# 
+# ## >> >> step two_change NoData values to -9999 ####
+# change_values = "/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/scripts/change_values.sh"
+# system(paste0("bash ", change_values, " ", outfile, " -9999"))
+# gdalUtils::gdalinfo(gsub(".tif", "_edt.tif", outfile))
+# file.copy(gsub(".tif", "_edt.tif", outfile), file.path(output_dir, "ESA_landuse_reclass.tif"))
+# file.remove(c(gsub(".tif", "_edt.tif", outfile), gsub(".tif", "_temp.tif", outfile)))
+# 
+# 
+# ## >> >> step three_create separate tif for each landuse class ####
+# ## NOTES: get unique values: https://gis.stackexchange.com/questions/33388/python-gdal-get-unique-values-in-discrete-valued-raster
+# ## NOTES: run python code: https://rstudio.github.io/reticulate/
+# infile <- file.path(output_dir, "ESA_landuse_reclass.tif")
+# vals <- 1:9
+# class <- c("crop", "crop_mosaic", "forest", "grass", 
+#            "shrub", "wetland", "urban", "other", "water")
+# outfile <- file.path(output_dir, paste0("lu", vals, class, ".tif"))
+# 
 # parallel::mclapply(seq_along(vals),
-#                    function(x) system(paste0("gdalwarp -overwrite -ot Byte -r average -tr ",
-#                                              paste(new_res, collapse = " "),
-#                                              " -s_srs '", wgs_crs, "'",
-#                                              " -t_srs '", new_crs, "' ",
+#                    function(x) system(paste0("gdal_calc.py -A ", infile,
+#                                              " --calc='((A==", x, "))*1 + (",
+#                                              paste0("(A==", vals[-x], ")",
+#                                                     collapse = " + "),
+#                                              ")*0' --NoDataValue=-9999",
+#                                              " --outfile=", outfile[x])),
+#                    mc.cores = length(vals), mc.preschedule = TRUE)
+# gdalUtils::gdalinfo(outfile[1])
+# 
+# 
+# ## >> >> step four_clip by e ####
+# infile <- outfile
+# outfile <- gsub(".tif", "_clip.tif", infile)
+# outfile = gsub("\\..*", ".tif", outfile)
+# new_extent <- "-180 -60 180 90"
+# 
+# parallel::mclapply(seq_along(vals),
+#                    function(x) system(paste0("gdalwarp -overwrite -ot Byte",
+#                                              " -te ", new_extent, " ",
 #                                              infile[x], " ", outfile[x])),
 #                    mc.cores = length(vals), mc.preschedule = TRUE)
-
-system(paste0("gdalwarp -overwrite -r average -tr ",
-              paste(new_res, collapse = " "),
-              " -t_srs '", new_crs, "' ",
-              infile[1], " ", outfile[1]))
-
-gdalUtils::gdalinfo(infile[1])
-sort(unique(values(raster(outfile[1]))))
-range(unique(values(raster(outfile[1]))), na.rm = TRUE)
-file.remove(infile)
-
-# ## >> >> step_clip: to make #cells equal between mask and layer ####
-# infile <- outfile
-# outfile <- sub("_ee", "_clip2", outfile)
-# mask_file <- file.path(output_dir, "globalmask_10k_ee.tif")
-# new_extent <- extent(raster(mask_file))
 # 
-# system(paste0("gdalwarp -overwrite -ot Byte -te ",
-#               paste(new_extent[1], new_extent[3],
-#                     new_extent[2], new_extent[4]), " ",
-#               infile, " ", outfile))
+# # system(paste0("gdalwarp -overwrite -ot Byte",
+# #               " -te ", new_extent, " ",
+# #               infile, " ", outfile))
+# gdalUtils::gdalinfo(outfile[1])
+# 
+# 
+# 
+# ## >> >> step five_create fractional layers at 0.1 degrees (= ~10k) ####
+# ## >> >> -- NOT WORKING -- ####
+# infile <- outfile
+# outfile <- gsub("_clip.tif", "_frac.tif", infile)
+# new_res <- c(0.1, 0.1)
+# 
+# system(paste0("gdalwarp -overwrite -r average -tr ",
+#               paste(new_res, collapse = " "), " ",
+#               infile[1], " ", outfile[1]))
+# 
+# 
+# ## >> >> step six_reproject to Equal Earth ####
+# ## resamplig method: near (https://support.esri.com/en/technical-article/000005606)
+# ## see: https://gis.stackexchange.com/questions/352476/bilinear-resampling-with-gdal-leaves-holes
+# infile <- outfile #list.files(output_dir, pattern = "_clip", full.names = TRUE)
+# outfile <- gsub("_clip.tif", "_frac.tif", infile)
+# new_res <- c(10000,10000)
+# new_crs = '+proj=eqearth +ellips=WGS84 +wktext'
+# wgs_crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" 
+# 
+# # parallel::mclapply(seq_along(vals),
+# #                    function(x) system(paste0("gdalwarp -overwrite -ot Byte -r average -tr ",
+# #                                              paste(new_res, collapse = " "),
+# #                                              " -s_srs '", wgs_crs, "'",
+# #                                              " -t_srs '", new_crs, "' ",
+# #                                              infile[x], " ", outfile[x])),
+# #                    mc.cores = length(vals), mc.preschedule = TRUE)
+# 
+# system(paste0("gdalwarp -overwrite -r average -tr ",
+#               paste(new_res, collapse = " "),
+#               " -t_srs '", new_crs, "' ",
+#               infile[1], " ", outfile[1]))
+# 
+# gdalUtils::gdalinfo(infile[1])
+# sort(unique(values(raster(outfile[1]))))
+# range(unique(values(raster(outfile[1]))), na.rm = TRUE)
+# file.remove(infile)
+# 
+# # ## >> >> step_clip: to make #cells equal between mask and layer ####
+# # infile <- outfile
+# # outfile <- sub("_ee", "_clip2", outfile)
+# # mask_file <- file.path(output_dir, "globalmask_10k_ee.tif")
+# # new_extent <- extent(raster(mask_file))
+# # 
+# # system(paste0("gdalwarp -overwrite -ot Byte -te ",
+# #               paste(new_extent[1], new_extent[3],
+# #                     new_extent[2], new_extent[4]), " ",
+# #               infile, " ", outfile))
+# # file.remove(infile)
+# 
+# 
+# ## >> >> step seven_mask ####
+# ## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R
+# infile <- outfile
+# outfile <- sub("_ee", "_eqar", outfile)
+# mask_file <- file.path(output_dir, "globalmask_10k_ee.tif")
+# 
+# gdalUtils::gdalinfo(mask_file)
+# parallel::mclapply(seq_along(vals),
+#                    function(x) system(paste0("gdal_calc.py -A ", infile[x], 
+#                                              " -B ", mask_file,
+#                                              " --calc='((B==1)*A) + (-9999*(B!=1))' --NoDataValue=-9999",
+#                                              " --outfile=", outfile[x])),
+#                    mc.cores = length(vals), mc.preschedule = TRUE)
+# gdalUtils::gdalinfo(outfile[3])
 # file.remove(infile)
 
 
-## >> >> step seven_mask ####
-## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R
-infile <- outfile
-outfile <- sub("_ee", "_eqar", outfile)
-mask_file <- file.path(output_dir, "globalmask_10k_ee.tif")
 
-gdalUtils::gdalinfo(mask_file)
-parallel::mclapply(seq_along(vals),
-                   function(x) system(paste0("gdal_calc.py -A ", infile[x], 
-                                             " -B ", mask_file,
-                                             " --calc='((B==1)*A) + (-9999*(B!=1))' --NoDataValue=-9999",
-                                             " --outfile=", outfile[x])),
-                   mc.cores = length(vals), mc.preschedule = TRUE)
-gdalUtils::gdalinfo(outfile[3])
-file.remove(infile)
-
-
-
-# ## >> II. Source: Copernicus (fractional land use) ####
+# ## >> III. Source: Copernicus (fractional land use) ####
 # ## Link @ GEE: https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V_Global
 # ## Direct download link: https://zenodo.org/communities/copernicus-land-cover/search?page=1&size=20
 # ## Data processing for global layer @ GEE co-authored by MC Loor: https://code.earthengine.google.com/?scriptPath=users%2Fpayalbal%2Fglobal_layers%3Afraclu_sklu. See processing in GEE for reclassification scheme.
@@ -324,88 +479,6 @@ file.remove(infile)
 # landuse <- c(lu1, lu2, lu3, lu4, lu5)
 
 
-
-## >> III. Source: LUH2 Hurtt data ####
-##
-
-hurtt_out <- file.path(data_dir, "landuse/hurtt_processing")
-if(!dir.exists(output_dir)) {
-  dir.create(output_dir)
-}
-infile <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse/Hurtt/ssp5-rcp85_2015-2100.nc"
-gdalUtils::gdalinfo(infile)
-
-lu <- nc_open(infile, write=FALSE, readunlim=FALSE, 
-              verbose=FALSE,auto_GMT=TRUE, 
-              suppress_dimvals=FALSE)
-
-names(lu)
-names(lu$var)
-names(lu$var$primf)
-str(lu$var$primf)
-
-lu$var$primf$missval
-ncvar_change_missval(primf.86, ...) 
-## Remember we have to open the file as writable to be able to change
-## the missing value on disk!
-
-primf.86 <- ncvar_get(lu, varid = "primf", 
-                   start = NA, count = NA, 
-                   verbose=FALSE,
-                   signedbyte=TRUE, 
-                   collapse_degen=TRUE, 
-                   raw_datavals=TRUE )
-
-typeof(primf.86); class(primf.86); str(primf.86); sum(is.na(primf.86))
-dim(primf.86)
-
-primf <- raster::brick(primf.86)
-
-## Change missign values to NA
-primf[[1]]
-primf[primf == lu$var$primf$missval] <- NA
-primf[[1]]
-
-## Set extent
-extent(primf) <-  c(-180, 180, -90, 90)
-
-## Rotate rasters
-primf_flip <- t(flip(primf_reproj[[1]], direction='y' ))
-plot(primf_flip)
-
-## Reproject rasters
-crs(primf) <- "+proj=longlat +datum=WGS84 +no_defs"
-primf_reproj <- projectRaster(primf, crs = "+proj=eqearth +ellips=WGS84 +wktext")
-
-plot(primf[[1]])
-plot(primf_reproj[[1]])
-
-mask_file <- file.path(output_dir, "globalmask_wgs_1degree.tif")
-raster(mask_file)
-
-primf.2015 <- primf[[1]]
-primf.2100 <- primf[[86]]
-
-r <- raster(nrows = 1440, ncols = 720,
-            xmn=-180, xmx=180, ymn=-90, ymx=90,
-            crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0", 
-            resolution = c(0.25, 0.25), 
-            vals=NULL)
-
-r[] <- getValues(raster(primf.86[ , ,1]))
-
-
-
-## Cdo operations...
-system(paste0("cdo -sinfo ", infile))
-system(paste0("cdo -showname ", infile))
-system(paste0("cdo -ntime ", infile))
-system(paste0("cdo -griddes ", infile))
-
-outfile <- file.path(hurtt_out, "temp.nc")
-system(paste0("cdo -chname, lat_bounds, bounds_lat ", infile, " ", outfile))
-
-system(paste0("ncrename -d time_bnds,bounds_time -d lat_bounds,bounds_lat -d lon_bounds,bounds_lon -v time_bnds,bounds_time -v lat_bounds,bounds_lat -v lon_bounds,bounds_lon ", infile, " ", outfile))
 
 
 ## --------------------------------------------------------------------------- ##

@@ -1,4 +1,4 @@
-# ppm_example
+# Species distribution models using bespoke ppm code
 scripts for running point process models for many species
 
 # Biodiversity data
