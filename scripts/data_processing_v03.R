@@ -10,25 +10,9 @@ gc()
 # system("ps")
 # system("pkill -f R")
 
-## Ensure ncdf4{} works
-## In terminal ssh into ubuntu@global-diversity/or in R terminal
-## type nc-config --libs
-Sys.getenv()
-Sys.getenv("LD_LIBRARY_PATH")
-Sys.setenv(LD_LIBRARY_PATH = paste(Sys.getenv("LD_LIBRARY_PATH"), "/usr/lib/x86_64-linux-gnu", "/usr/lib/x86_64-linux-gnu/hdf5/serial", sep = ":"))
-
-## Install processNC{}
-## https://github.com/RS-eco/processNC
-if(!"remotes" %in% installed.packages()[,"Package"]) install.packages("remotes")
-if(!"processNC" %in% installed.packages()[,"Package"]) remotes::install_github("RS-eco/processNC", build_vignettes=T)
-
-## cdo 
-## https://code.mpimet.mpg.de/projects/cdo/
-
-
 ## Load libraries
 # devtools::install_github('skiptoniam/sense')
-x <- c('data.table', 'sp', 'raster', 
+x <- c('data.table', 'sp', 'raster', 'terra',
        'rgdal', 'sense', 'tools', 'bitops', 
        'ncdf4', 'processNC',
        'RCurl', 'gdalUtils', 'usethis',
@@ -37,9 +21,12 @@ x <- c('data.table', 'sp', 'raster',
 lapply(x, require, character.only = TRUE)
 rm(x)
 
+## Specify global variables
+proj.res.km <- 10
+
 ## Folder paths
 data_dir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data"
-output_dir <- file.path(data_dir, "outputs", "layers_10k")
+output_dir <- file.path(data_dir, "outputs", sprintf("layers_%sk", proj.res.km))
 if(!dir.exists(output_dir)) {
   dir.create(output_dir)
 }
@@ -66,6 +53,7 @@ source("/home/payalb/gsdms_r_vol/tempdata/workdir/landuse_projects/land-use/gdal
 # devtools::source_url(url)
 # url <- "https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons.git"
 # devtools::install_git(url = url)
+
 
 
 
@@ -100,7 +88,7 @@ raster(outfile)
 ## see: https://en.wikipedia.org/wiki/Equal_Earth_projection
 infile <- outfile
 outfile <- gsub("_clip", "_ee", infile)
-new_res <- c(10000,10000) ## 10km res
+new_res <- c(proj.res.km*1000, proj.res.km*1000)
 # new_res <- c(1000,1000) ## 1km res
 new_crs = '+proj=eqearth +ellips=WGS84 +wktext'
 system(paste0("gdalwarp -overwrite -ot Byte -tr ",
@@ -126,7 +114,7 @@ unique(values(raster(file.path(output_dir, "globalmask_ee_edt.tif"))))
 plot(raster(file.path(output_dir, "globalmask_ee_edt.tif")))
 
 file.rename(file.path(output_dir, "globalmask_ee_edt.tif"), 
-            file.path(output_dir, "globalmask_10k_ee.tif"))
+            file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km)))
 
 file.remove(file.path(output_dir, "globalmask_ee_temp.tif"))
 file.remove(outfile)
@@ -139,161 +127,70 @@ file.remove(outfile)
 ## ----------------------------------------------------------------------------- ## 
 
 ## >> I. Source: LUH2 Hurtt data ####
+## https://luh.umd.edu/
 ## 2015 - 2100 (86 time steps)
-## FOR LATER: Convert python script to function using reticulate
 
 hurtt_out <- file.path(data_dir, "outputs", "hurtt")
 if(!dir.exists(hurtt_out)) {
   dir.create(hurtt_out)
 }
+# file.remove(list.files(hurtt_out, full.names = TRUE))
 
-## SSP input files
+## Explore Hurtt input files
 infiles = list.files(file.path(data_dir, "landuse/Hurtt"), 
                      pattern = ".nc$", full.names = TRUE)
 
-## Time steps
-t.all <- seq(2015, 2100, 1)
-t.steps <- seq(2015, 2070, 5)
-t.idx <- which(t.all %in% t.steps)
-
-## Land use variable names
 gdalUtils::gdalinfo(infiles[1])
 lu <- ncdf4::nc_open(infiles[1], write=FALSE, readunlim=FALSE, 
                      verbose=FALSE,auto_GMT=TRUE, 
                      suppress_dimvals=FALSE)
 names(lu)
-luvars = names(lu$var)
-luvars = luvars[1:12]
+names(lu$var)
 
-  # ## Output file names
-  # outpath = '/tempdata/research-cifs/uom_data/gsdms_data/outputs/hurtt/'
-  # temp = c()
-  # outfiles = c()
-  # 
-  # for ( x in infiles ) {
-  #   for ( y in luvars ) {
-  #     for ( t in t.idx ) {
-  #       temp <- paste0(outpath, gsub("_2015-2100", "", basename(x)), "_", y, "_t", t.all[t], ".nc")
-  #       outfiles <- c(outfiles, temp)
-  #     }
-  #   }
-  # }
-  # 
-  # rm(temp, temp1, x, y, t)
-  # 
-  # ## Check
-  # length(outfiles) == length(infiles) * length(luvars) * length(t.idx)
+temp <- ncvar_get(temp, varid = "primf", 
+                  start = NA, count = NA, 
+                  verbose=FALSE,
+                  signedbyte=TRUE, 
+                  collapse_degen=TRUE, 
+                  raw_datavals=TRUE )
+temp <- plot(raster(temp2))
 
-## Run oythonn processing script
-system("bash /tempdata/workdir/gsdms/scripts/run_python_processing.sh")
-length(list.files(hurtt_out))
+## Specify time steps and index
+time.all <- seq(2015, 2100, 1)
+time.steps <- seq(2015, 2070, 5)
+time.idx <- which(t.all %in% t.steps)
+
+## >> Extract layers by ssp, land use and year ####
+system("bash /tempdata/workdir/gsdms/scripts/extract_nc.sh")
 
 ## Check files
-x <- '/tempdata/research-cifs/uom_data/gsdms_data/outputs/hurtt/ssp5-rcp85_urban_t1.nc'
+length(list.files(hurtt_out))
+x <- list.files(hurtt_out, full.names = TRUE)
 raster(x)
 plot(raster(x))
 
+## Rename files by year of time slice
+for (i in 1:length(t.idx)){
+  x <- list.files(hurtt_out, full.names = TRUE, pattern = paste0("t", t.idx[i], ".nc$"))
+  y <- gsub(paste0("t", t.idx[i], ".nc$"), paste0("t", t.steps[i], ".nc"), x)
+  file.rename(x, y)
+}
+
+hurttfiles <- list.files(hurtt_out, full.names = TRUE); length(hurttfiles)
 
 
+## >> Aggregate crop layers ... TO FIX ####
+system("bash /tempdata/workdir/gsdms/scripts/max_nc.sh")
+gdalinfo(infiles[1])
 
-temp <- ncdf4::nc_open(x, write=FALSE, readunlim=FALSE, 
-                       verbose=FALSE,auto_GMT=TRUE, 
-                       suppress_dimvals=FALSE)
-temp2 <- ncvar_get(temp, varid = "primf", 
-                      start = NA, count = NA, 
-                      verbose=FALSE,
-                      signedbyte=TRUE, 
-                      collapse_degen=TRUE, 
-                      raw_datavals=TRUE )
+## Create a tif file to extract metadata
+system(sprintf("gdal_translate NETCDF:%s:%s %s.tif", infiles[1], "c3ann", paste0(hurtt_out, "/temp")))
 
-temp2 <- raster(temp2)
-crs(temp2) <- "+proj=longlat +datum=WGS84 +no_defs"
-temp3 <- projectRaster(temp2, crs = "+proj=eqearth +ellips=WGS84 +wktext")
+## No Data Values
 
-plot(t(temp3))
+## Reproject - reso, crs
 
-
-
-
-
-
-
-infile <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse/Hurtt/ssp5-rcp85_2015-2100.nc"
-gdalUtils::gdalinfo(infile)
-
-lu <- ncdf4::nc_open(infile, write=FALSE, readunlim=FALSE, 
-              verbose=FALSE,auto_GMT=TRUE, 
-              suppress_dimvals=FALSE)
-
-names(lu)
-names(lu$var)
-names(lu$var$primf)
-str(lu$var$primf)
-
-lu$var$primf$missval
-ncvar_change_missval(primf.86, ...) 
-## Remember we have to open the file as writable to be able to change
-## the missing value on disk!
-
-primf.86 <- ncvar_get(lu, varid = "primf", 
-                      start = NA, count = NA, 
-                      verbose=FALSE,
-                      signedbyte=TRUE, 
-                      collapse_degen=TRUE, 
-                      raw_datavals=TRUE )
-
-typeof(primf.86); class(primf.86); str(primf.86); sum(is.na(primf.86))
-dim(primf.86)
-
-primf <- raster::brick(primf.86)
-
-## Change missign values to NA
-primf[[1]]
-primf[primf == lu$var$primf$missval] <- NA
-primf[[1]]
-
-## Set extent
-# extent(primf[[1]]) <-  c(-180, 180, -90, 90)
-
-
-## Reproject rasters
-crs(primf) <- "+proj=longlat +datum=WGS84 +no_defs"
-primf_reproj <- projectRaster(primf[[1]], crs = "+proj=eqearth +ellips=WGS84 +wktext")
-
-## Rotate rasters
-primf_flip <- t(flip(primf_reproj[[1]], direction='y' ))
-plot(primf_flip)
-
-
-plot(primf[[1]])
-plot(primf_reproj[[1]])
-
-mask_file <- file.path(output_dir, "globalmask_wgs_1degree.tif")
-raster(mask_file)
-
-primf.2015 <- primf[[1]]
-primf.2100 <- primf[[86]]
-
-r <- raster(nrows = 1440, ncols = 720,
-            xmn=-180, xmx=180, ymn=-90, ymx=90,
-            crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0", 
-            resolution = c(0.25, 0.25), 
-            vals=NULL)
-
-r[] <- getValues(raster(primf.86[ , ,1]))
-
-
-
-## Cdo operations...
-system(paste0("cdo -sinfo ", infile))
-system(paste0("cdo -showname ", infile))
-system(paste0("cdo -ntime ", infile))
-system(paste0("cdo -griddes ", infile))
-
-outfile <- file.path(hurtt_out, "temp.nc")
-system(paste0("cdo -chname, lat_bounds, bounds_lat ", infile, " ", outfile))
-
-system(paste0("ncrename -d time_bnds,bounds_time -d lat_bounds,bounds_lat -d lon_bounds,bounds_lon -v time_bnds,bounds_time -v lat_bounds,bounds_lat -v lon_bounds,bounds_lon ", infile, " ", outfile))
+## Mask
 
 
 
@@ -360,8 +257,7 @@ system(paste0("ncrename -d time_bnds,bounds_time -d lat_bounds,bounds_lat -d lon
 # 
 # 
 # 
-# ## >> >> step five_create fractional layers at 0.1 degrees (= ~10k) ####
-# ## >> >> -- NOT WORKING -- ####
+# ## >> >> step five_create fractional layers at 0.1 degrees (= ~10k) -- NOT WORKING -- ####
 # infile <- outfile
 # outfile <- gsub("_clip.tif", "_frac.tif", infile)
 # new_res <- c(0.1, 0.1)
@@ -401,7 +297,7 @@ system(paste0("ncrename -d time_bnds,bounds_time -d lat_bounds,bounds_lat -d lon
 # # ## >> >> step_clip: to make #cells equal between mask and layer ####
 # # infile <- outfile
 # # outfile <- sub("_ee", "_clip2", outfile)
-# # mask_file <- file.path(output_dir, "globalmask_10k_ee.tif")
+# # mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))
 # # new_extent <- extent(raster(mask_file))
 # # 
 # # system(paste0("gdalwarp -overwrite -ot Byte -te ",
@@ -415,7 +311,7 @@ system(paste0("ncrename -d time_bnds,bounds_time -d lat_bounds,bounds_lat -d lon
 # ## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R
 # infile <- outfile
 # outfile <- sub("_ee", "_eqar", outfile)
-# mask_file <- file.path(output_dir, "globalmask_10k_ee.tif")
+# mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))
 # 
 # gdalUtils::gdalinfo(mask_file)
 # parallel::mclapply(seq_along(vals),
@@ -500,7 +396,7 @@ bio_rcp45 <- list.files(file.path(data_dir, "gcm_30s"), pattern = "*bc45*", full
 bio_rcp85 <- list.files(file.path(data_dir, "gcm_30s"), pattern = "*bc85*", full.names = TRUE)
 # bio_rcp60 <- list.files(file.path(data_dir, "gcm_30s"), pattern = "*bc60*", full.names = TRUE)
 
-## GCM data quartiles - TO DO...
+## >> GCM data quartiles - TO DO... ####
 # ## ALL GCMs
 # ## Source: from regSSP scripts
 # ## *** replace with gdal functions...
@@ -612,7 +508,7 @@ file.remove(infile)
 ## >> step three_clip: to make #cells equal between mask and layer ####
 infile <- outfile
 outfile <- sub("_ee", "_clip2", outfile)
-mask_file <- file.path(output_dir, "globalmask_10k_ee.tif")
+mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))
 new_extent <- extent(raster(mask_file))
 
 parallel::mclapply(seq_along(infile),
@@ -633,7 +529,7 @@ file.remove(infile)
 ## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R
 infile <- outfile
 outfile <- sub("_clip2", "_eqar", outfile)
-mask_file <- file.path(output_dir, "globalmask_10k_ee.tif")
+mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))
 
 gdalUtils::gdalinfo(mask_file)
 parallel::mclapply(seq_along(infile),
@@ -657,8 +553,8 @@ file.remove(infile)
 ## Find min non-NA set values across mask and covariates and sync NAs ####
 ## -------------------------------------------------------------------------- ##
 
-mask_file <- file.path(output_dir, "globalmask_10k_ee.tif")
-mask_file2 <- file.path(output_dir, "globalmask_10k_ee_minNA.tif")
+mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))
+mask_file2 <- file.path(output_dir, sprintf("globalmask_%sk_ee_minNA.tif", proj.res.km))
 file.copy(mask_file, mask_file2)
 
 ## Update mask based on covariate layers for syncing NAs
@@ -742,14 +638,14 @@ lapply(infile, gdalinfo, stats = TRUE)
 ## ***** Need to swap out rasterToPoints() and stack() when working with large rasters *****
 ## NOTE: Trial alternative approach using biogeoregions
 
-mask_file <- file.path(input_dir, "globalmask_10k_ee_minNA.tif")
+mask_file <- file.path(input_dir, sprintf("globalmask_%sk_ee_minNA.tif", proj.res.km))
 global_mask0 <- raster(mask_file); freq(global_mask0)
 global_mask0[which(is.na(global_mask0[]))] <- 0; freq(global_mask0)
 rpts <- rasterToPoints(global_mask0, spatial=TRUE)
 mask_pts <- data.frame(rpts@data, X=coordinates(rpts)[,1], Y=coordinates(rpts)[,2])
 mask_pts <- mask_pts[,-1]
-fwrite(mask_pts, file = file.path(output_dir, "globalmask_10k_eeXY.csv"))
-# mask_pts <- fread(file.path(output_dir, "globalmask_10k_eeXY.csv"))
+fwrite(mask_pts, file = file.path(output_dir, sprintf("globalmask_%sk_eeXY.tif", proj.res.km)))
+# mask_pts <- fread(file.path(output_dir, sprintf("globalmask_%sk_eeXY.tif", proj.res.km)))
 dat <- stack(infile[-grep('bc45|bc85', infile)])
 dat <- as.data.table(na.omit(cbind(mask_pts, as.matrix(dat))))
 
@@ -824,3 +720,134 @@ dim(dat_mod); dim(dat_rcp45); dim(dat_rcp85)
 
 
 
+
+## EXTRAS
+# ## Ensure ncdf4{} works
+# ## In terminal ssh into ubuntu@global-diversity/or in R terminal
+# ## type nc-config --libs
+# Sys.getenv()
+# Sys.getenv("LD_LIBRARY_PATH")
+# Sys.setenv(LD_LIBRARY_PATH = paste(Sys.getenv("LD_LIBRARY_PATH"), "/usr/lib/x86_64-linux-gnu", "/usr/lib/x86_64-linux-gnu/hdf5/serial", sep = ":"))
+
+# ## Install processNC{}
+# ## https://github.com/RS-eco/processNC
+# if(!"remotes" %in% installed.packages()[,"Package"]) install.packages("remotes")
+# if(!"processNC" %in% installed.packages()[,"Package"]) remotes::install_github("RS-eco/processNC", build_vignettes=T)
+
+## cdo 
+## https://code.mpimet.mpg.de/projects/cdo/
+
+lu$var$primf$missval
+ncvar_change_missval(primf.86, ...) 
+## Remember we have to open the file as writable to be able to change
+## the missing value on disk!
+
+primf.86 <- ncvar_get(lu, varid = "primf", 
+                      start = NA, count = NA, 
+                      verbose=FALSE,
+                      signedbyte=TRUE, 
+                      collapse_degen=TRUE, 
+                      raw_datavals=TRUE )
+
+typeof(primf.86); class(primf.86); str(primf.86); sum(is.na(primf.86))
+dim(primf.86)
+
+primf <- raster::brick(primf.86)
+
+## Change missign values to NA
+primf[[1]]
+primf[primf == lu$var$primf$missval] <- NA
+primf[[1]]
+
+## Set extent
+# extent(primf[[1]]) <-  c(-180, 180, -90, 90)
+
+
+## Reproject rasters
+crs(primf) <- "+proj=longlat +datum=WGS84 +no_defs"
+primf_reproj <- projectRaster(primf[[1]], crs = "+proj=eqearth +ellips=WGS84 +wktext")
+
+## Rotate rasters
+primf_flip <- t(flip(primf_reproj[[1]], direction='y' ))
+plot(primf_flip)
+
+
+plot(primf[[1]])
+plot(primf_reproj[[1]])
+
+mask_file <- file.path(output_dir, "globalmask_wgs_1degree.tif")
+raster(mask_file)
+
+primf.2015 <- primf[[1]]
+primf.2100 <- primf[[86]]
+
+r <- raster(nrows = 1440, ncols = 720,
+            xmn=-180, xmx=180, ymn=-90, ymx=90,
+            crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0", 
+            resolution = c(0.25, 0.25), 
+            vals=NULL)
+
+r[] <- getValues(raster(primf.86[ , ,1]))
+
+
+
+## Cdo operations...
+system(paste0("cdo -sinfo ", infile))
+system(paste0("cdo -showname ", infile))
+system(paste0("cdo -ntime ", infile))
+system(paste0("cdo -griddes ", infile))
+
+outfile <- file.path(hurtt_out, "temp.nc")
+system(paste0("cdo -chname, lat_bounds, bounds_lat ", infile, " ", outfile))
+
+system(paste0("ncrename -d time_bnds,bounds_time -d lat_bounds,bounds_lat -d lon_bounds,bounds_lon -v time_bnds,bounds_time -v lat_bounds,bounds_lat -v lon_bounds,bounds_lon ", infile, " ", outfile))
+
+
+for (ssp in c("ssp1-rcp26", "ssp3-rcp70", "ssp5-rcp85")){
+  for (t in time.steps){
+    
+    # ssp = "ssp5-rcp85"
+    # t = 2070
+    
+    ## Get relevant files
+    infiles <- hurttfiles[grepl(sprintf("(?=.*%s)(?=.*t%s\\.nc)", ssp, t), hurttfiles, perl = TRUE)]
+    infiles <- grep("c3|c4", infiles, value = TRUE)
+    outfile <- file.path(hurtt_out, sprintf("%s_crops_t%s.tif", ssp, t))
+    
+    # ## Create max raster - gdal
+    # system(paste0("gdal_calc.py -A ", infiles[1], " -B ", infiles[2],  " -C ", infiles[3], 
+    #               " -D ", infiles[4],  " -E ", infiles[5],  
+    #               " --calc='maximum(maximum(maximum(A,B),maximum(C,D)),E)'",
+    #               " --outfile=", outfile))
+    # ## nope...
+    
+    
+    # ## Create max raster - terra::rast
+    # ## Note: terra::rast messes with raster values
+    # ## problems with which.max - gives index; extracting values usign index removed NAs and createx raster without crs, extemt, etc. 
+    # st <- stack(infiles)
+    # ## Find index of max value
+    # st2 <- which.max(st)
+    # ## Subset max values from input rasters to create new raster
+    # st3 <- terra::rast(st[st2])
+    # st4 <- extract(st, spxy, buffer = 1000000, small = TRUE, 
+    #                  fun = mean, na.rm = TRUE)
+    # 
+    # crs(st3) <- crs(st) ... 
+    # st3 <- mask(st3, st[[1]])
+    # 
+    # ## Write raster
+    # terra::writeCDF(st3, outfile, varname = sprintf("%s_crops_t%s", ssp, t))
+    
+    # ## Run python script to create max raster
+    # system(paste("gdalbuildvrt -r maximum -input_file_list ", csvname, " ", y))
+  }
+}
+
+
+
+
+## https://stackoverflow.com/questions/10129561/how-to-find-max-values-from-multiple-lists
+
+# hurttfiles[grepl("(?=.*ssp1)(?=.*t2015\\.nc)(?=.*c3)(?=.*c4)", hurttfiles_crops, perl = TRUE)]
+#   ## does not work because c4 is not a subset of c3 or vice versa
