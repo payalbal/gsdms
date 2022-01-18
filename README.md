@@ -7,21 +7,28 @@ Citation:
 # Covariate data sources
 
 
-# ------------------------
-# TO BE RESOLVED:
-1. Use tile 29 data for model building and vn data for prediction...
-Probably not when the analysis become global because in that case we will have to use country + tile data for every region..
-Maybe an option for species with less records when fittign models to regional subsets?
+# Workflow
+1. Download & clean GBIF data: https://github.com/payalbal/gbifprocessing
+
+2. Download covariate data: data_downloads
+
+3. Covariate data processing: data_processing
+
+4. Model fitting: ppm_fitting
+
+5. Model predictions: ppm_predictions
+
+6. Mapping: 
+
+Functions:
+
+Ancillary script files
 
 
-2 Quadrature (background) points
-LATER: For global analyses, generate points based on species-regions as per convex hull+buffer aroubnd occurrence points.
 
 
-3. Estimate species weights
-LATER: not quite right yet
 
-
+Notes:
 4.Move species occurrence points falling off the mask to nearest 'land' cells
 We lose data again i.e. number of unique locations is reduced. This can be problematic for ppms...
 

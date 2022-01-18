@@ -194,10 +194,9 @@ system(sprintf("gdal_translate NETCDF:%s:%s %s.tif", infiles[1], "c3ann", paste0
 
 
 
-
 # ## >> II. Source: ESA (fractional land use) ####
-# ## http://maps.elie.ucl.ac.be/CCI/viewer/download.php 
-# landuse <- list.files("/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse/CCI",
+# ## http://maps.elie.ucl.ac.be/CCI/viewer/download.php
+# landuse <- list.files("/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse/ESA_CCI_Landcover",
 #                       pattern = "landuse.tif$", full.names = TRUE)
 # outfile <- gsub("ESA_landuse", "ESA_landuse_reclass", landuse)
 # 
@@ -223,9 +222,9 @@ system(sprintf("gdal_translate NETCDF:%s:%s %s.tif", infiles[1], "c3ann", paste0
 # ## NOTES: run python code: https://rstudio.github.io/reticulate/
 # infile <- file.path(output_dir, "ESA_landuse_reclass.tif")
 # vals <- 1:9
-# class <- c("crop", "crop_mosaic", "forest", "grass", 
+# class <- c("crop", "crop_mosaic", "forest", "grass",
 #            "shrub", "wetland", "urban", "other", "water")
-# outfile <- file.path(output_dir, paste0("lu", vals, class, ".tif"))
+# outfile <- file.path(output_dir, paste0("ESA_lu", vals, class, ".tif"))
 # 
 # parallel::mclapply(seq_along(vals),
 #                    function(x) system(paste0("gdal_calc.py -A ", infile,
@@ -257,14 +256,14 @@ system(sprintf("gdal_translate NETCDF:%s:%s %s.tif", infiles[1], "c3ann", paste0
 # 
 # 
 # 
-# ## >> >> step five_create fractional layers at 0.1 degrees (= ~10k) -- NOT WORKING -- ####
-# infile <- outfile
-# outfile <- gsub("_clip.tif", "_frac.tif", infile)
-# new_res <- c(0.1, 0.1)
-# 
-# system(paste0("gdalwarp -overwrite -r average -tr ",
-#               paste(new_res, collapse = " "), " ",
-#               infile[1], " ", outfile[1]))
+#   # ## >> >> step five_create fractional layers at 0.1 degrees (= ~10k) -- NOT WORKING -- ####
+#   # infile <- outfile
+#   # outfile <- gsub("_clip.tif", "_frac.tif", infile)
+#   # new_res <- c(0.1, 0.1)
+#   # 
+#   # system(paste0("gdalwarp -overwrite -r average -tr ",
+#   #               paste(new_res, collapse = " "), " ",
+#   #               infile[1], " ", outfile[1]))
 # 
 # 
 # ## >> >> step six_reproject to Equal Earth ####
@@ -274,15 +273,15 @@ system(sprintf("gdal_translate NETCDF:%s:%s %s.tif", infiles[1], "c3ann", paste0
 # outfile <- gsub("_clip.tif", "_frac.tif", infile)
 # new_res <- c(10000,10000)
 # new_crs = '+proj=eqearth +ellips=WGS84 +wktext'
-# wgs_crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" 
+# wgs_crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 # 
-# # parallel::mclapply(seq_along(vals),
-# #                    function(x) system(paste0("gdalwarp -overwrite -ot Byte -r average -tr ",
-# #                                              paste(new_res, collapse = " "),
-# #                                              " -s_srs '", wgs_crs, "'",
-# #                                              " -t_srs '", new_crs, "' ",
-# #                                              infile[x], " ", outfile[x])),
-# #                    mc.cores = length(vals), mc.preschedule = TRUE)
+#   # parallel::mclapply(seq_along(vals),
+#   #                    function(x) system(paste0("gdalwarp -overwrite -ot Byte -r average -tr ",
+#   #                                              paste(new_res, collapse = " "),
+#   #                                              " -s_srs '", wgs_crs, "'",
+#   #                                              " -t_srs '", new_crs, "' ",
+#   #                                              infile[x], " ", outfile[x])),
+#   #                    mc.cores = length(vals), mc.preschedule = TRUE)
 # 
 # system(paste0("gdalwarp -overwrite -r average -tr ",
 #               paste(new_res, collapse = " "),
@@ -294,17 +293,17 @@ system(sprintf("gdal_translate NETCDF:%s:%s %s.tif", infiles[1], "c3ann", paste0
 # range(unique(values(raster(outfile[1]))), na.rm = TRUE)
 # file.remove(infile)
 # 
-# # ## >> >> step_clip: to make #cells equal between mask and layer ####
-# # infile <- outfile
-# # outfile <- sub("_ee", "_clip2", outfile)
-# # mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))
-# # new_extent <- extent(raster(mask_file))
-# # 
-# # system(paste0("gdalwarp -overwrite -ot Byte -te ",
-# #               paste(new_extent[1], new_extent[3],
-# #                     new_extent[2], new_extent[4]), " ",
-# #               infile, " ", outfile))
-# # file.remove(infile)
+#   # ## >> >> step_clip: to make #cells equal between mask and layer ####
+#   # infile <- outfile
+#   # outfile <- sub("_ee", "_clip2", outfile)
+#   # mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))
+#   # new_extent <- extent(raster(mask_file))
+#   #
+#   # system(paste0("gdalwarp -overwrite -ot Byte -te ",
+#   #               paste(new_extent[1], new_extent[3],
+#   #                     new_extent[2], new_extent[4]), " ",
+#   #               infile, " ", outfile))
+#   # file.remove(infile)
 # 
 # 
 # ## >> >> step seven_mask ####
@@ -315,13 +314,14 @@ system(sprintf("gdal_translate NETCDF:%s:%s %s.tif", infiles[1], "c3ann", paste0
 # 
 # gdalUtils::gdalinfo(mask_file)
 # parallel::mclapply(seq_along(vals),
-#                    function(x) system(paste0("gdal_calc.py -A ", infile[x], 
+#                    function(x) system(paste0("gdal_calc.py -A ", infile[x],
 #                                              " -B ", mask_file,
 #                                              " --calc='((B==1)*A) + (-9999*(B!=1))' --NoDataValue=-9999",
 #                                              " --outfile=", outfile[x])),
 #                    mc.cores = length(vals), mc.preschedule = TRUE)
 # gdalUtils::gdalinfo(outfile[3])
 # file.remove(infile)
+
 
 
 
@@ -345,7 +345,7 @@ system(sprintf("gdal_translate NETCDF:%s:%s %s.tif", infiles[1], "c3ann", paste0
 # ## ref: https://stackoverflow.com/a/50235578
 # 
 # ## step one_Get a list of all tif tiles downloaded from Google Earth Engine
-# tile_files <- list.files(path = file.path(data_dir, "copernicus/global_frac/sklu_classes/tifs/"), pattern = "*.tif", full.names = TRUE)
+# tile_files <- list.files(path = file.path(data_dir, "landuse/Copernicus/global_frac/sklu_classes/tifs/"), pattern = "*.tif", full.names = TRUE)
 # 
 # ## step two_Build a virtual raster file stitching all tiles
 # ## WARNING: This will fail if the file it is trying to write to (output.vrt) already exists
@@ -353,8 +353,8 @@ system(sprintf("gdal_translate NETCDF:%s:%s %s.tif", infiles[1], "c3ann", paste0
 # 
 # ## step three_Copy the virtual raster to an actual physical file
 # ## WARNING: This takes ~5 minutes to run
-# gdal_translate(src_dataset = file.path(data_dir, "copernicus", "lu_world.vrt"), 
-#                dst_dataset = file.path(data_dir, "copernicus", "lu_world.tif"), 
+# gdal_translate(src_dataset = file.path(data_dir, "copernicus", "lu_world.vrt"),
+#                dst_dataset = file.path(data_dir, "copernicus", "lu_world.tif"),
 #                output_Raster = FALSE,
 #                options = c("BIGTIFF=YES", "COMPRESSION=LZW"))
 # 
@@ -372,6 +372,8 @@ system(sprintf("gdal_translate NETCDF:%s:%s %s.tif", infiles[1], "c3ann", paste0
 # lu3 <- file.path(file.path(data_dir, "copernicus", "landuse_class3.tif"))
 # lu4 <- file.path(file.path(data_dir, "copernicus", "landuse_class4.tif"))
 # lu5 <- file.path(file.path(data_dir, "copernicus", "landuse_class5.tif"))
+# 
+# ## load landuse layer
 # landuse <- c(lu1, lu2, lu3, lu4, lu5)
 
 
@@ -546,12 +548,13 @@ unique(values(raster(outfile[n])))
 plot(raster(outfile[n]))
 
 file.remove(infile)
-
+rm(list)
 
 
 ## -------------------------------------------------------------------------- ##
 ## Find min non-NA set values across mask and covariates and sync NAs ####
 ## -------------------------------------------------------------------------- ##
+infiles <- list.files()
 
 mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))
 mask_file2 <- file.path(output_dir, sprintf("globalmask_%sk_ee_minNA.tif", proj.res.km))
@@ -721,7 +724,11 @@ dim(dat_mod); dim(dat_rcp45); dim(dat_rcp85)
 
 
 
-## EXTRAS
+
+
+
+## -------------------------------------------------------------------------- ##
+## EXTRAS ####
 # ## Ensure ncdf4{} works
 # ## In terminal ssh into ubuntu@global-diversity/or in R terminal
 # ## type nc-config --libs

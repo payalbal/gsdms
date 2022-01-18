@@ -807,6 +807,7 @@ saveRDS(prediction_list, file = paste0(output_dir, "/predlist_",  gsub("-", "", 
 
 
 
+## ---- MOVE TO NEW SCRIPT ---- ####
 ## Predict and save output ####
 newdata <- predxyz
 bkdat <- backxyz200k
