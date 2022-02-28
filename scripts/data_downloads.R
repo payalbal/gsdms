@@ -2,216 +2,244 @@
 
 
 ## Set working environment ---- ####
-data_covs <- "../data" # set path to data folder server: "/tempdata/workdir/data"
-setwd(data_covs)
-library(bitops)
-library(RCurl)
+rm(list = ls())
+gc()
+# system("ps")
+# system("pkill -f R")
+
+
+## Load libraries
+x <- c('bitops', 'RCurl', 'rstudioapi')
+lapply(x, require, character.only = TRUE)
+rm(x)
+
+data_dir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data"
+setwd(data_dir)
+
 
 
 ## GBIF backbone taxonomy ---- ####
 ##  GBIF Secretariat (2017). GBIF Backbone Taxonomy. Checklist dataset https://doi.org/10.15468/39omei accessed via GBIF.org on 2019-08-26.
-system(paste0("curl http://rs.gbif.org/datasets/backbone/backbone-current.zip -o ", data_covs, "/gbif_taxonomy.zip"))
-unzip(file.path(data_covs, "gbif_taxonomy.zip"), list = TRUE)
-unzip(file.path(data_covs, "gbif_taxonomy.zip"), files = 'Taxon.tsv', exdir = data_path)
+system(paste0("curl http://rs.gbif.org/datasets/backbone/backbone-current.zip -o ", data_dir, "/gbif_taxonomy.zip"))
+unzip(file.path(data_dir, "gbif_taxonomy.zip"), list = TRUE)
+unzip(file.path(data_dir, "gbif_taxonomy.zip"), files = 'Taxon.tsv', exdir = data_path)
 
 
-## WorldClim data - download tiles and stitch to make global layer ---- ####
-## Source: https://www.worldclim.org/version1
-## author: Chris Ware
+# ## WorldClim data - download tiles and stitch to make global layer ---- ####
+# ## Source: https://www.worldclim.org/version1
+# ## author: Chris Ware
+# 
+# ## set path to download each zip archive to (will be deleted once used)
+# ## must have .zip ext
+# zipdst = file.path(data_dir, 'bio_30s.zip')
+# 
+# ## set dir to extract raster files to
+# rasterdst = file.path(data_dir, 'bio_30s/')
+# if(!dir.exists(rasterdst)) {
+#   dir.create(rasterdst)
+# } # end if !dir.exists
+# 
+# ## set path to write the global raster for each bioclim variable to
+# bioclim_dst = paste0(rasterdst, 'bio_current_') # or whatever
+# 
+# ## Looking at the getData function, it finds which tile a given lat lon  falls witin. 
+# ## The tiles are then indexed by row/col which maps to a url. 
+# ## Can cut to the chase and just create urls with all combos of row/cols (i.e. tile ids)
+# urls_bioclim = NULL
+# for (r in 1:5){
+#   for (c in 1:12){
+#     
+#     rc = paste0(r-1, c-1)
+#     fn = paste0('bio_', rc, '.zip')
+#     thisurl = paste0('https://biogeo.ucdavis.edu/data/climate/worldclim/1_4/tiles/cur/', fn)
+#     urls_bioclim = c(urls_bioclim, thisurl)
+#     
+#   }
+# }
+# 
+# ## check all the urls exist (which hopefully means all the tiles can be downloaded)
+#   # require(bitops)
+#   # require(RCurl)
+# test = lapply(urls_bioclim, url.exists)
+# all(unlist(test))
+# 
+# ## Then, it's possible to loop over the urls, downloading, and unzipping them. 
+# download_from_url <- function (urls, zipdst, rasterdst) {
+#   
+#   for (url in urls){
+#     response = tryCatch({
+#       download.file(url, destfile = zipdst)
+#     }, 
+#     error = function(e){e}) # shouldn't get called
+#     
+#     print(response) # should be 0
+#     unzip(zipdst, exdir = rasterdst)
+#     file.remove(zipdst)
+#   }
+# } 
+# 
+# download_from_url(urls = urls_bioclim, zipdst = zipdst, rasterdst = rasterdst)
+# 
+# ## rasterdst should now be full of bioclim 1-19 tiles (60 tiles for each var)
+# ## loop over each bioclim variable, collect all tiles, and mosaic. 
+# for (i in 1:19){
+#   f = list.files(rasterdst, pattern = paste0('bio', i, '_'), full.names = TRUE)
+#   f = f[grep('.bil$', f)]
+#   
+#   f = lapply(f, raster)
+#   
+#   ## specify a function for any overlapping cells (of which there won't be any, 
+#   ## but the function requires a function...)
+#   f$fun = mean
+#   mos = do.call(mosaic, f)
+#   
+#   this_dst = paste0(bioclim_dst, i, '.tif') # or whatever
+#   writeRaster(mos, this_dst)
+# }
+# 
+# 
+# ## WorldClim data - Future GCMs
+# ## Year: 2070, GCM: BCC-CSM1-1
+# url_bc85bi70 = "http://biogeo.ucdavis.edu/data/climate/cmip5/30s/bc85bi70.zip"
+# url_bc26bi70 = "http://biogeo.ucdavis.edu/data/climate/cmip5/30s/bc26bi70.zip"
+# download_from_url(urls = c(url_bc26bi70, url_bc85bi70), zipdst, rasterdst)
+# 
+#   # ## From regSSP scripts
+#   # ## Global variables
+#   # regions <- "global"
+#   # rcps <- c("45", "60", "85")
+#   # models <- c("BC", "CC", "GS", "HD", "HE", "IP", "MI", "MR", "MC", "MG", "NO")
+#   # 
+#   # global_mask <- raster(bio_current[1])
+#   # global_mask[which(!is.na(global_mask[]))] <- 1
+#   # crs(global_mask) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+#   # writeRaster(global_mask, filename = paste0(data_dir, "/mask_global.tif"))
+#   # 
+#   # 
+#   # ## Downlaoad GCM model predictions
+#   # urls_bioclim <- c()
+#   # for (model_i in models){
+#   #   for (rcp_j in rcps){
+#   #     fn = paste0(tolower(model_i), rcp_j, 'bi70', '.zip')
+#   #     thisurl = paste0('https://biogeo.ucdavis.edu/data/climate/cmip5/30s/', fn)
+#   #     urls_bioclim = c(urls_bioclim, thisurl)
+#   #   }
+#   # }
+#   # library(bitops)
+#   # library(RCurl)
+#   # test = lapply(urls_bioclim, url.exists)
+#   # all(unlist(test))
+#   # 
+#   # zipdst = file.path(gsdms_data, 'gcm_30s.zip')
+#   # rasterdst = file.path(gsdms_data, 'gcm_30s/')
+#   # if(!dir.exists(rasterdst)) {
+#   #   dir.create(rasterdst)
+#   # } # end if !dir.exists
+#   # for (i in 1:length(urls_bioclim)){
+#   #   download_from_url(urls = urls_bioclim[i], zipdst, rasterdst)
+#   # }
+#   # 
+#   # ## Mask data for study regions & create stacks by region and gcms
+#   # files_gcm <- list.files(file.path(gsdms_data, 'gcm_30s'), full.names = T, recursive = T)
+#   # gcm_reg_path <- file.path(data_dir, 'gcm_reg')
+#   # dir.create(gcm_reg_path)
+#   # 
+#   # for(region in regions){
+#   #   for(model_i in models){
+#   #     reg_stack <- list()
+#   #     file_mod <- files_gcm[grepl(model_i, files_gcm)]
+#   #     for(j in 1:length(rcps)){
+#   #       file_mod_rcp <- file_mod[grepl(rcps[j], file_mod)]
+#   #       temp_stack <- list()
+#   #       for(f in 1:length(file_mod_rcp)){
+#   #         reg_mask <- readRDS(file.path(data_dir, paste0("mask_", region, ".rds")))
+#   #         temp_stack[[f]] <- mask(crop(raster(file_mod_rcp[f]), reg_mask), reg_mask)
+#   #       }
+#   #       reg_stack[[j]] <- readAll(brick(temp_stack))
+#   #     }
+#   #     saveRDS(reg_stack, file = paste0(gcm_reg_path, "/", region, "_", model_i, ".rds"))
+#   #   }
+#   # }
+#   # rm(temp_stack, reg_stack)
+#   # 
+#   # ## Extract cell-wise quartiles across GCM
+#   # quartiles <- c("q1", "q2", "q3")
+#   # 
+#   # for(region in regions){
+#   #   gcm <- list.files(gcm_reg_path, full.names = T, pattern = region)
+#   #   reg_mask <- readRDS(file.path(data_dir, paste0("mask_", region, ".rds")))
+#   #   r <- reg_mask
+#   #   inds <- which(!is.na(r[]))
+#   #   
+#   #   j<-1
+#   #   for(j in 1:length(rcps)){
+#   #     saveRDS(stack(), file = paste0(data_dir, "/bio", "q1_", rcps[j], "_", region,  ".rds"))
+#   #     saveRDS(stack(), file = paste0(data_dir, "/bio", "q2_", rcps[j], "_", region,  ".rds"))
+#   #     saveRDS(stack(), file = paste0(data_dir, "/bio", "q3_", rcps[j], "_", region,  ".rds"))
+#   #     print(paste0("processing rcp", rcps[j]))
+#   #     for(k in 1:19){
+#   #       print(paste0("processing bioclim var: ", k))
+#   #       bio <- stack()
+#   #       for(i in 1:length(models)){
+#   #         print(paste0("processing model: ", i))
+#   #         dat <- readRDS(gcm[[i]])[[j]]
+#   #         bio <- stack(bio, dat[[k]])
+#   #       }
+#   #       
+#   #       print(paste0("getting quartiles..."))
+#   #       df1 <- na.omit(as.matrix(getValues(bio)))
+#   #       c <-rowQuartiles(df1, probs = c(0.25, 0.5, 0.75))
+#   #       for(m in 1:3){
+#   #         bioclim <- readRDS(file = paste0(data_dir, "/bio", quartiles[m], "_", rcps[j], "_", region,  ".rds"))
+#   #         r[inds] <- c[,m]
+#   #         names(r) <- paste0("bio", k)
+#   #         saveRDS(readAll(stack(bioclim, r)), file = paste0(data_dir, "/bio", quartiles[m], "_", rcps[j], "_", region,  ".rds"))
+#   #       }
+#   #     }
+#   #   }
+#   # }
+#   # unlink(gcm_reg_path, recursive=T)
+# 
+# ## by quartile data in :
+# ## files  <- list.files(file.path(rdata_path), pattern = region, full.names = TRUE)
+# ## bioq <- files[grepl("bioq", files)]
 
-## set path to download each zip archive to (will be deleted once used)
-## must have .zip ext
-zipdst = file.path(data_covs, 'bio_30s.zip')
-
-## set dir to extract raster files to
-rasterdst = file.path(data_covs, 'bio_30s/')
-if(!dir.exists(rasterdst)) {
-  dir.create(rasterdst)
-} # end if !dir.exists
-
-## set path to write the global raster for each bioclim variable to
-bioclim_dst = paste0(rasterdst, 'bio_current_') # or whatever
-
-## Looking at the getData function, it finds which tile a given lat lon  falls witin. 
-## The tiles are then indexed by row/col which maps to a url. 
-## Can cut to the chase and just create urls with all combos of row/cols (i.e. tile ids)
-urls_bioclim = NULL
-for (r in 1:5){
-  for (c in 1:12){
-    
-    rc = paste0(r-1, c-1)
-    fn = paste0('bio_', rc, '.zip')
-    thisurl = paste0('https://biogeo.ucdavis.edu/data/climate/worldclim/1_4/tiles/cur/', fn)
-    urls_bioclim = c(urls_bioclim, thisurl)
-    
-  }
-}
-
-## check all the urls exist (which hopefully means all the tiles can be downloaded)
-  # require(bitops)
-  # require(RCurl)
-test = lapply(urls_bioclim, url.exists)
-all(unlist(test))
-
-## Then, it's possible to loop over the urls, downloading, and unzipping them. 
-download_from_url <- function (urls, zipdst, rasterdst) {
-  
-  for (url in urls){
-    response = tryCatch({
-      download.file(url, destfile = zipdst)
-    }, 
-    error = function(e){e}) # shouldn't get called
-    
-    print(response) # should be 0
-    unzip(zipdst, exdir = rasterdst)
-    file.remove(zipdst)
-  }
-} 
-
-download_from_url(urls = urls_bioclim, zipdst = zipdst, rasterdst = rasterdst)
-
-## rasterdst should now be full of bioclim 1-19 tiles (60 tiles for each var)
-## loop over each bioclim variable, collect all tiles, and mosaic. 
-for (i in 1:19){
-  f = list.files(rasterdst, pattern = paste0('bio', i, '_'), full.names = TRUE)
-  f = f[grep('.bil$', f)]
-  
-  f = lapply(f, raster)
-  
-  ## specify a function for any overlapping cells (of which there won't be any, 
-  ## but the function requires a function...)
-  f$fun = mean
-  mos = do.call(mosaic, f)
-  
-  this_dst = paste0(bioclim_dst, i, '.tif') # or whatever
-  writeRaster(mos, this_dst)
-}
 
 
-## WorldClim data - Future GCMs
-## Year: 2070, GCM: BCC-CSM1-1
-url_bc85bi70 = "http://biogeo.ucdavis.edu/data/climate/cmip5/30s/bc85bi70.zip"
-url_bc26bi70 = "http://biogeo.ucdavis.edu/data/climate/cmip5/30s/bc26bi70.zip"
-download_from_url(urls = c(url_bc26bi70, url_bc85bi70), zipdst, rasterdst)
+## CHELSA ---- ####
+## Current: 1981-2010
+input_files <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/CHELSA/v2_cmip6_1981-2010_envidatS3paths.txt"
+target_folder <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/CHELSA/"
+system(sprintf("wget --no-host-directories --force-directories --input-file=%s -P %s", input_files, target_folder))
 
-  # ## From regSSP scripts
-  # ## Global variables
-  # regions <- "global"
-  # rcps <- c("45", "60", "85")
-  # models <- c("BC", "CC", "GS", "HD", "HE", "IP", "MI", "MR", "MC", "MG", "NO")
-  # 
-  # global_mask <- raster(bio_current[1])
-  # global_mask[which(!is.na(global_mask[]))] <- 1
-  # crs(global_mask) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
-  # writeRaster(global_mask, filename = paste0(data_covs, "/mask_global.tif"))
-  # 
-  # 
-  # ## Downlaoad GCM model predictions
-  # urls_bioclim <- c()
-  # for (model_i in models){
-  #   for (rcp_j in rcps){
-  #     fn = paste0(tolower(model_i), rcp_j, 'bi70', '.zip')
-  #     thisurl = paste0('https://biogeo.ucdavis.edu/data/climate/cmip5/30s/', fn)
-  #     urls_bioclim = c(urls_bioclim, thisurl)
-  #   }
-  # }
-  # library(bitops)
-  # library(RCurl)
-  # test = lapply(urls_bioclim, url.exists)
-  # all(unlist(test))
-  # 
-  # zipdst = file.path(gsdms_data, 'gcm_30s.zip')
-  # rasterdst = file.path(gsdms_data, 'gcm_30s/')
-  # if(!dir.exists(rasterdst)) {
-  #   dir.create(rasterdst)
-  # } # end if !dir.exists
-  # for (i in 1:length(urls_bioclim)){
-  #   download_from_url(urls = urls_bioclim[i], zipdst, rasterdst)
-  # }
-  # 
-  # ## Mask data for study regions & create stacks by region and gcms
-  # files_gcm <- list.files(file.path(gsdms_data, 'gcm_30s'), full.names = T, recursive = T)
-  # gcm_reg_path <- file.path(data_covs, 'gcm_reg')
-  # dir.create(gcm_reg_path)
-  # 
-  # for(region in regions){
-  #   for(model_i in models){
-  #     reg_stack <- list()
-  #     file_mod <- files_gcm[grepl(model_i, files_gcm)]
-  #     for(j in 1:length(rcps)){
-  #       file_mod_rcp <- file_mod[grepl(rcps[j], file_mod)]
-  #       temp_stack <- list()
-  #       for(f in 1:length(file_mod_rcp)){
-  #         reg_mask <- readRDS(file.path(data_covs, paste0("mask_", region, ".rds")))
-  #         temp_stack[[f]] <- mask(crop(raster(file_mod_rcp[f]), reg_mask), reg_mask)
-  #       }
-  #       reg_stack[[j]] <- readAll(brick(temp_stack))
-  #     }
-  #     saveRDS(reg_stack, file = paste0(gcm_reg_path, "/", region, "_", model_i, ".rds"))
-  #   }
-  # }
-  # rm(temp_stack, reg_stack)
-  # 
-  # ## Extract cell-wise quartiles across GCM
-  # quartiles <- c("q1", "q2", "q3")
-  # 
-  # for(region in regions){
-  #   gcm <- list.files(gcm_reg_path, full.names = T, pattern = region)
-  #   reg_mask <- readRDS(file.path(data_covs, paste0("mask_", region, ".rds")))
-  #   r <- reg_mask
-  #   inds <- which(!is.na(r[]))
-  #   
-  #   j<-1
-  #   for(j in 1:length(rcps)){
-  #     saveRDS(stack(), file = paste0(data_covs, "/bio", "q1_", rcps[j], "_", region,  ".rds"))
-  #     saveRDS(stack(), file = paste0(data_covs, "/bio", "q2_", rcps[j], "_", region,  ".rds"))
-  #     saveRDS(stack(), file = paste0(data_covs, "/bio", "q3_", rcps[j], "_", region,  ".rds"))
-  #     print(paste0("processing rcp", rcps[j]))
-  #     for(k in 1:19){
-  #       print(paste0("processing bioclim var: ", k))
-  #       bio <- stack()
-  #       for(i in 1:length(models)){
-  #         print(paste0("processing model: ", i))
-  #         dat <- readRDS(gcm[[i]])[[j]]
-  #         bio <- stack(bio, dat[[k]])
-  #       }
-  #       
-  #       print(paste0("getting quartiles..."))
-  #       df1 <- na.omit(as.matrix(getValues(bio)))
-  #       c <-rowQuartiles(df1, probs = c(0.25, 0.5, 0.75))
-  #       for(m in 1:3){
-  #         bioclim <- readRDS(file = paste0(data_covs, "/bio", quartiles[m], "_", rcps[j], "_", region,  ".rds"))
-  #         r[inds] <- c[,m]
-  #         names(r) <- paste0("bio", k)
-  #         saveRDS(readAll(stack(bioclim, r)), file = paste0(data_covs, "/bio", quartiles[m], "_", rcps[j], "_", region,  ".rds"))
-  #       }
-  #     }
-  #   }
-  # }
-  # unlink(gcm_reg_path, recursive=T)
+## Future
+x <- list.files("/home/payalb/gsdms_r_vol/tempdata/research-cifs/proj-2200_nature_futures21-1128.4.411/global/cmip6/bio/mean",
+                full.names = TRUE)
+file.copy(x, "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/CHELSA/future/mean/",
+           overwrite = FALSE, recursive = TRUE,
+           copy.mode = TRUE, copy.date = TRUE)
 
-## by quartile data in :
-## files  <- list.files(file.path(rdata_path), pattern = region, full.names = TRUE)
-## bioq <- files[grepl("bioq", files)]
+list.files("/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/CHELSA/future/mean/")
+
 
 
 ## SRTM ---- ####
 ## Source: https://topotools.cr.usgs.gov/gmted_viewer/gmted2010_global_grids.php
 system("wget https://edcintl.cr.usgs.gov/downloads/sciweb1/shared/topo/downloads/GMTED/Grid_ZipFiles/mn30_grd.zip -O data/srtm.zip")
-unzip(file.path(data_covs, "srtm.zip"), list = TRUE)
-unzip(file.path(data_covs, "srtm.zip"), exdir = file.path(data_covs, "srtm"))
-file.remove(file.path(data_covs, "srtm.zip"))
+unzip(file.path(data_dir, "srtm.zip"), list = TRUE)
+unzip(file.path(data_dir, "srtm.zip"), exdir = file.path(data_dir, "srtm"))
+file.remove(file.path(data_dir, "srtm.zip"))
 ## all files within the mn30_grd folder seem to be the same when in as raster
-srtm <- file.path(data_covs, "srtm/mn30_grd/w001000.adf")
+srtm <- file.path(data_dir, "srtm/mn30_grd/w001000.adf")
 file.rename(srtm, sub(file_path_sans_ext(basename(srtm)), "srtm", srtm))
-srtm <- file.path(data_covs, "srtm/mn30_grd/srtm.adf")
+srtm <- file.path(data_dir, "srtm/mn30_grd/srtm.adf")
 
 
     ## Alternate SRTM source: http://srtm.csi.cgiar.org/srtmdata/ (extent= -180,180,-60,60)
     ##  on weblink select all 30 x 30 tiles and Geo TIFF format > Search
     ## Can only download by tile, so they'll need to be stiched after...
     ## To download a tile..
-    # setwd(data_covs)
+    # setwd(data_dir)
     # system("wget http://srtm.csi.cgiar.org/wp-content/uploads/files/srtm_30x30/TIFF/N00E090.zip -O srtm_csi.zip")
     # temp <- unzip("srtm_csi.zip", list = TRUE)
     # unzip("srtm_csi.zip", exdir = "./")
@@ -259,8 +287,13 @@ unzip("data/soil.zip", exdir = "/tempdata/workdir/data")
 file.rename(paste0("/tempdata/workdir/data/", temp$Name), sub(file_path_sans_ext(basename(temp$Name)),"soil", paste0("/tempdata/workdir/data/", temp$Name)))
 file.remove("data/soil.zip")
 
+
+
 ## Landuse ----- ####
-## Source: ESA - Climate Research Data Package (CRDP)
+## >> Source: Hurtt dataset - manual download ####
+
+
+## >> Source: ESA - Climate Research Data Package (CRDP) ####
 ## http://maps.elie.ucl.ac.be/CCI/viewer/download.php
 ## Click on 'Copernicus Climate Change Service (C3S) Climate Data Store (CDS)' link
 ## > Download Data (login if required)
@@ -281,15 +314,11 @@ system(paste0("gdalwarp -of Gtiff -co COMPRESS=LZW -co TILED=YES -ot Byte -te -1
 file.rename(paste0(file.path(ludir, basename(tools::file_path_sans_ext(landuse))), ".tif"), 
             file.path(ludir,"ESA_landuse.tif"))
 file.remove(landuse)
-
-
 ## OR https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V-C3_Global
-
 ## OR https://data.pnnl.gov/group/nodes/dataset/13192
 
 
-
-  # ## Alternative source (discreet): Copernicus data
+  # ## >> Alternate source (discreet): Copernicus data ####
   # ## ------- reclassify, resample, download by tile and stich tiles
   # ## Link @ GEE: https://developers.google.com/earth-engine/datasets/catalog/COPERNICUS_Landcover_100m_Proba-V_Global (updated)
   # ## Direct download link: https://zenodo.org/communities/copernicus-land-cover/search?page=1&size=20
@@ -326,11 +355,11 @@ file.remove(landuse)
   #                options = c("BIGTIFF=YES", "COMPRESSION=LZW"))
 
 
-  # ## Alternative source (fractional data) - Hoskins data 
+  # ## >> Alternate source (fractional data) - Hoskins data ####
   # ... [follow up with CW for single fractional LU map with 12 classes]
   
 
-  # ## Alternative source (discrete data 2015 only): Copernicus land use data
+  # ## >> Alternate source (discrete data 2015 only): Copernicus land use data ####
   # ## source: https://land.copernicus.eu/global/content/release-global-100m-land-cover-maps-2015
   # ## https://zenodo.org/communities/copernicus-land-cover/search?page=1&size=20
   # ## https://zenodo.org/record/3243509#.XiU6d1MzbOQ
@@ -346,24 +375,25 @@ file.remove(landuse)
   # system("wget https://zenodo.org/record/3243509/files/ProbaV_LC100_epoch2015_global_v2.0.2_discrete-classification_EPSG-4326.tif -O /tempdata/workdir/data/raw/discrete-classification_EPSG4326.tif")
 
 
-  # ## Alternative Source (discrete data): https://earthexplorer.usgs.gov/
+  # ## >> Alternate Source (discrete data): https://earthexplorer.usgs.gov/ ####
   # ## Click 'Data Sets' tab > Land Cover > GLCC > Click 'Results >>'
   # ## Select one pf the global datasets and download manually through the browser
-  # ## Save zip folder @data_covs
+  # ## Save zip folder @data_dir
   # ## Readme: https://www.usgs.gov/media/images/global-land-cover-characteristics-data-base-version-20
-  # unzip(file.path(data_covs, "glccgbe20_tif.zip"), files = 'gbigbpgeo20.tif', exdir = data_covs)
-  # landuse <- file.path(data_covs,"gbigbpgeo20.tif")
+  # unzip(file.path(data_dir, "glccgbe20_tif.zip"), files = 'gbigbpgeo20.tif', exdir = data_dir)
+  # landuse <- file.path(data_dir,"gbigbpgeo20.tif")
   # file.rename(landuse, sub(file_path_sans_ext(basename(landuse)), "landuse", landuse))
-  # landuse <- file.path(data_covs,"landuse.tif")
+  # landuse <- file.path(data_dir,"landuse.tif")
 
 
-  # ## Alternative source (discrete data) - Hurtt dataset: http://luh.umd.edu/
-  # crop <- raster(file.path(data_covs, "hoskins_landuse" , "CRP_2005/CRP_1km_2005_0ice.bil"))
-  # pasture <- raster(file.path(data_covs, "hoskins_landuse" , "PAS_2005/PAS_1km_2005_0ice.bil"))
-  # primaryforest <- raster(file.path(data_covs, "hoskins_landuse" , "PRI_2005/PRI_1km_2005_0ice.bil"))
-  # secondforest <- raster(file.path(data_covs, "hoskins_landuse" , "SEC_2005/SEC_1km_2005_0ice.bil"))
-  # urban <- raster(file.path(data_covs, "hoskins_landuse" , "URB_2005/URB_1km_2005_0ice.bil"))
+  # ## >> Alternate source (discrete data) - Hurtt from Hoskins dataset: http://luh.umd.edu/ ####
+  # crop <- raster(file.path(data_dir, "hoskins_landuse" , "CRP_2005/CRP_1km_2005_0ice.bil"))
+  # pasture <- raster(file.path(data_dir, "hoskins_landuse" , "PAS_2005/PAS_1km_2005_0ice.bil"))
+  # primaryforest <- raster(file.path(data_dir, "hoskins_landuse" , "PRI_2005/PRI_1km_2005_0ice.bil"))
+  # secondforest <- raster(file.path(data_dir, "hoskins_landuse" , "SEC_2005/SEC_1km_2005_0ice.bil"))
+  # urban <- raster(file.path(data_dir, "hoskins_landuse" , "URB_2005/URB_1km_2005_0ice.bil"))
   
+
 
 ## Roads ---- ####
 ## Source (requires login): https://sedac.ciesin.columbia.edu/data/set/groads-global-roads-open-access-v1
@@ -384,11 +414,22 @@ unzip("data/roads_oceaniaeast.zip", exdir = "/tempdata/workdir/data/roads_oceani
 
 
 ## Lakes & rivers ---- ####
-## Source: http://www.soest.hawaii.edu/wessel/gshhg/
-system("wget -r -np -nH --reject 'index.html*' -e robots=off http://www.soest.hawaii.edu/pwessel/gshhg/gshhg-shp-2.3.7.zip -O data/lakesrivers.zip")
-dir.create("/tempdata/workdir/data/lakesrivers")
-unzip("data/lakesrivers.zip", exdir = "/tempdata/workdir/data/lakesrivers")
+## Source: https://www.worldwildlife.org/pages/global-lakes-and-wetlands-database (Level 3)
+target_folder <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/lakesrivers/GLWD/"
+system(sprintf("wget wget -r -np -nH --reject 'index.html*' -e robots=off https://files.worldwildlife.org/wwfcmsprod/files/Publication/file/9slil0ww7t_GLWD_level3.zip -P %s", target_folder))
+unzip(file.path(target_folder, "wwfcmsprod/files/Publication/file/9slil0ww7t_GLWD_level3.zip"), exdir = target_folder)
 
+
+# ## Source: http://www.soest.hawaii.edu/wessel/gshhg/
+# ## Dated from 1996 publication
+# system("wget -r -np -nH --reject 'index.html*' -e robots=off http://www.soest.hawaii.edu/pwessel/gshhg/gshhg-shp-2.3.7.zip -O data/lakesrivers.zip")
+# dir.create("/tempdata/workdir/data/lakesrivers")
+# unzip("data/lakesrivers.zip", exdir = "/tempdata/workdir/data/lakesrivers")
+
+## Other sources
+## https://land.copernicus.eu/global/products/wb
+## https://data.europa.eu/data/datasets/jrc-floods-floodmapgl_permwb-tif?locale=en based on GLWD
+## https://global-surface-water.appspot.com/download
 
 ## Built-up areas ---- ####
 ## Source: https://ghsl.jrc.ec.europa.eu/download.php?ds=bu
@@ -403,28 +444,64 @@ unzip("data/builtup.zip", exdir = "/tempdata/workdir/data/builtup")
 
 
 ## Protected areas ---- #### 
-## Source: https://www.protectedplanet.net/
-system("wget -r -np -nH --reject 'index.html*' -e robots=off https://www.protectedplanet.net/downloads/WDPA_Aug2020?type=shapefile -O /tempdata/workdir/data/protectedareas.zip")
-dir.create("/tempdata/workdir/data/protectedareas")
-pafiles <- unzip("/tempdata/workdir/data/protectedareas.zip", list = TRUE)[c(1:3),]
-unzip("/tempdata/workdir/data/protectedareas.zip", files = pafiles$Name, exdir = "/tempdata/workdir/data/protectedareas")
-  ## corrupted zip file but the 3 split zip files are unzipped
-  ## manual download to get the complete folder
-pafiles <- list.files("/tempdata/workdir/data/protectedareas", pattern = "WDPA_Aug2020-shapefile", full.names = TRUE)
-for (i in 1:length(pafiles)) {
-  unzip(pafiles[i], exdir = paste0("/tempdata/workdir/data/protectedareas/", basename(tools::file_path_sans_ext(pafiles[i]))))
+## Source: https://www.protectedplanet.net/en/thematic-areas/wdpa?tab=WDPA
+target_folder <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/protectedareas"
+system(sprintf("wget wget -r -np -nH --reject 'index.html*' -e robots=off https://d1gam3xoknrgr2.cloudfront.net/current/WDPA_Feb2022_Public_shp.zip -P %s", target_folder))
+unzip(file.path(target_folder, "wwfcmsprod/files/Publication/file/9slil0ww7t_GLWD_level3.zip"), exdir = target_folder)
+unzip(file.path(target_folder, "current/WDPA_Feb2022_Public_shp.zip"), exdir = target_folder)
+unlink(file.path(target_folder, "current"), recursive = TRUE)
+unlink(file.path(target_folder, "current"))
+
+## >> Unzip tile files
+infiles <- list.files(target_folder, pattern = ".zip", full.names = TRUE)
+unzip(infiles[1], list = TRUE)
+
+  # lapply(infiles, unzip, exdir = infiles)
+  #   ## unnzipped files have same filenames, so files get overwritten
+for (i in infiles) {
+  unzip(i, exdir = file.path(target_folder, basename(tools::file_path_sans_ext(i)), ""))
 }
+
+
+## >> Stitch tiles
+job_script <- "/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/scripts/tilestitch_wdpa_job.R"
+rstudioapi::jobRunScript(job_script, encoding = "unknown", 
+                         workingDir = "/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/",
+                         importEnv = FALSE, exportEnv = "")
+
+data_dir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data"
+if(file.exists(file.path(data_dir, "protectedareas/wdpa.tif"))){
+  file.remove(file.path(data_dir, "protectedareas/wdpa_temp.vrt"))
+}
+
 
 ## Population ---- ####
 ## Source (requires login): https://sedac.ciesin.columbia.edu/data/set/gpw-v4-population-density-rev11
 ## Select year (2000), fileformat (GeoTiff), resolution (30 sec) 
 ## Click 'Create Download' and copy download links
 ## Unable to find direct download link
-...system("wget -r -np -nH --reject 'index.html*' -e robots=off https://sedac.ciesin.columbia.edu/downloads/data/gpw-v4/gpw-v4-population-density-rev11/gpw-v4-population-density-rev11_2000_30_sec_tif.zip -O data/population.zip")
-dir.create("/tempdata/workdir/data/population")
+target_folder <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/population/SEDAC"
+system(sprintf("wget -r -np -nH --reject 'index.html*' -e robots=off https://sedac.ciesin.columbia.edu/downloads/data/gpw-v4/gpw-v4-population-density-rev11/gpw-v4-population-density-rev11_2000_30_sec_tif.zip -P %s", target_folder))
+
 unzip("data/population.zip", exdir = "/tempdata/workdir/data/population")
 
 
+## Tree cover ---- ####
+## Source: Hansen https://storage.googleapis.com/earthenginepartners-hansen/GFC-2020-v1.8/download.html
+## Download urls for 'treecover2000'
+input_files <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/Hansen_treecover/treecover2000_urls.txt"
+target_folder <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/Hansen_treecover/"
+system(sprintf("wget --no-host-directories --force-directories --input-file=%s -P %s", input_files, target_folder))
 
+## >> Stitch tiles
+job_script <- "/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/scripts/tilestitch_job.R"
+rstudioapi::jobRunScript(job_script, encoding = "unknown", 
+                         workingDir = "/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/",
+                         importEnv = FALSE, exportEnv = "")
+
+data_dir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data"
+if(file.exists(file.path(data_dir, "Hansen_treecover/hansen_tree.tif"))){
+  file.remove(file.path(data_dir, "Hansen_treecover/hansen_treetemp.vrt"))
+}
 
 

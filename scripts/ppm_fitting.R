@@ -59,24 +59,24 @@ scens_rcps <- sort(apply(expand.grid(quartiles, rcps), 1, paste0, collapse="_"))
 
 
 ## Biodiversity data ####
-  # ## Section to be moved to gbif_processing script later
-  # gbif_wgs <- fread(file.path(data_dir, "gbif/2019-05-14_gbif_iucnsp.csv"))
-  # gbif_wgs[, .N, species]
-  # gbif_wgs <- as.data.frame(gbif_wgs)
-  # 
-  # ## Project biodiv data points in equal area projection - TO MODIFY
-  # ## Need to swap out SpatialPointsDataFrame() when working with full GBIF dataset
-  # wgs_crs  <-  "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
-  # eqarea_crs <- "+proj=eqearth +datum=WGS84 +ellps=WGS84 +wktext" ## check conversion; looks finne in QGIS
-  # spdf <- SpatialPointsDataFrame(coords = gbif_wgs[c("decimallongitude", "decimallatitude")],
-  #                                data =gbif_wgs, proj4string = CRS(wgs_crs))
-  # spdf <- spTransform(spdf, CRSobj = CRS(eqarea_crs))
-  # 
-  # gbif <- as.data.table(spdf)
-  # gbif <- gbif[,c(6,7,2,1,5)]
-  # names(gbif)[1:2] <- c("X", "Y")
-  # head(gbif)
-  # fwrite(gbif, file = file.path(output_dir, "2019-05-14_gbif_iucnsp_EA.csv"))
+# ## Section to be moved to gbif_processing script later
+# gbif_wgs <- fread(file.path(data_dir, "gbif/2019-05-14_gbif_iucnsp.csv"))
+# gbif_wgs[, .N, species]
+# gbif_wgs <- as.data.frame(gbif_wgs)
+# 
+# ## Project biodiv data points in equal area projection - TO MODIFY
+# ## Need to swap out SpatialPointsDataFrame() when working with full GBIF dataset
+# wgs_crs  <-  "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+# eqarea_crs <- "+proj=eqearth +datum=WGS84 +ellps=WGS84 +wktext" ## check conversion; looks finne in QGIS
+# spdf <- SpatialPointsDataFrame(coords = gbif_wgs[c("decimallongitude", "decimallatitude")],
+#                                data =gbif_wgs, proj4string = CRS(wgs_crs))
+# spdf <- spTransform(spdf, CRSobj = CRS(eqarea_crs))
+# 
+# gbif <- as.data.table(spdf)
+# gbif <- gbif[,c(6,7,2,1,5)]
+# names(gbif)[1:2] <- c("X", "Y")
+# head(gbif)
+# fwrite(gbif, file = file.path(output_dir, "2019-05-14_gbif_iucnsp_EA.csv"))
 
 occdat <- fread(file.path(input_dir, "2019-05-14_gbif_iucnsp_EA.csv"))[,.(X, Y, species)]
 
@@ -91,63 +91,63 @@ occdat <- fread(file.path(input_dir, "2019-05-14_gbif_iucnsp_EA.csv"))[,.(X, Y, 
 ## Trial terra package here
 ## Alternarte approach: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0079168
 
-  # ## Option 1:
-  # ## Create empty raster
-  # global_mask <- raster(file.path(input_dir, "globalmask_10k_ee_minNA.tif"))
-  # r <- global_mask
-  # r[] <- 0
-  # 
-  # ## Count the number of records per cell
-  # tab <- table(cellFromXY(r, occdat[,1:2])) ## sample occ_data when using full dataset
-  # r[as.numeric(names(tab))] <- tab
-  # r <- mask(r,global_mask)
-  # 
-  # ## Make zeros a very small number otherwise issues with log(0).
-  # r[r[]==0] <- 1e-6
-  # arear <- raster::area(r)
-  # 
-  # ## Calculate the probability that a cell has been sampled while accounting for area differences in lat/lon
-  # off.bias <- (-log(1-exp(-r*arear)) - log( arear))
-  # names(off.bias) <- "off.bias"
+# ## Option 1:
+# ## Create empty raster
+# global_mask <- raster(file.path(input_dir, "globalmask_10k_ee_minNA.tif"))
+# r <- global_mask
+# r[] <- 0
+# 
+# ## Count the number of records per cell
+# tab <- table(cellFromXY(r, occdat[,1:2])) ## sample occ_data when using full dataset
+# r[as.numeric(names(tab))] <- tab
+# r <- mask(r,global_mask)
+# 
+# ## Make zeros a very small number otherwise issues with log(0).
+# r[r[]==0] <- 1e-6
+# arear <- raster::area(r)
+# 
+# ## Calculate the probability that a cell has been sampled while accounting for area differences in lat/lon
+# off.bias <- (-log(1-exp(-r*arear)) - log( arear))
+# names(off.bias) <- "off.bias"
 
-  
-  # ## Option 2:
-  # temp.ala<-SpatialPoints(occdat[,c(1, 2)], proj4string=crs(global_mask))
-  # 
-  # ## Craete empty raster to catch data
-  # global_mask <- raster(file.path(input_dir, "globalmask_10k_ee_minNA.tif"))
-  # r <- global_mask
-  # r[] <- 0
-  # 
-  # ## Calculate area to adjust for
-  # ## QUESTION: Difference between lambda_offset and area_offset?
-  # arear <- raster::area(r)
-  # lambda <- rasterize(temp.ala, arear, fun = function(x,...){length(x)})
-  # l1 <- crop(lambda, extent(-180, 0, -90, 90)) ## convert to equal earth: extent(global_mask)
-  # l2 <- crop(lambda, extent(0, 180, -90, 90)) ## convert to equal earth: extent(global_mask)
-  # extent(l1) <- c(180, 360, -90, 90) ## convert to equal earth: extent(global_mask)
-  # lm <- merge(l1, l2)
-  # lm[is.na(lm)]<-0
-  # lm1 <- lm
-  # lambda_mask <- mask(lm,global_mask)
-  # lambda_offset <- 1-exp(-1 * lambda_mask)
-  # lambda_offset[lambda_offset == 0] <- 1e-6
-  # area_rast_mask <- mask(raster::area(lm), global_mask)
-  # ## If offset as just area: spp ~ blah + foo + offset(log(area_rast))
-  # ## IF offset as area + bias: spp ~ blah + foo + offset(log(off.area_rast)-log(off.bias))
-  # 
-  # writeRaster(lambda_offset,
-  #             filename = file.path(output_dir, "effort_offset_lambda_0360.tif"),
-  #             format = "GTiff",overwrite = TRUE)
-  # saveRDS(lambda_offset, file.path(output_dir, "effort_offset_lambda_0360.rds"))
-  # 
-  # writeRaster(area_rast_mask,
-  #             filename = file.path(output_dir, "area_offset_0360.tif"),
-  #             format = "GTiff", overwrite = TRUE)
-  # saveRDS(area_rast_mask,filename = file.path(output_dir, "area_offset_0360.rds"))
-  # 
-  # ## Add offset to covariate stacks for model and prediction
-  # off.bias <- ...
+
+# ## Option 2:
+# temp.ala<-SpatialPoints(occdat[,c(1, 2)], proj4string=crs(global_mask))
+# 
+# ## Craete empty raster to catch data
+# global_mask <- raster(file.path(input_dir, "globalmask_10k_ee_minNA.tif"))
+# r <- global_mask
+# r[] <- 0
+# 
+# ## Calculate area to adjust for
+# ## QUESTION: Difference between lambda_offset and area_offset?
+# arear <- raster::area(r)
+# lambda <- rasterize(temp.ala, arear, fun = function(x,...){length(x)})
+# l1 <- crop(lambda, extent(-180, 0, -90, 90)) ## convert to equal earth: extent(global_mask)
+# l2 <- crop(lambda, extent(0, 180, -90, 90)) ## convert to equal earth: extent(global_mask)
+# extent(l1) <- c(180, 360, -90, 90) ## convert to equal earth: extent(global_mask)
+# lm <- merge(l1, l2)
+# lm[is.na(lm)]<-0
+# lm1 <- lm
+# lambda_mask <- mask(lm,global_mask)
+# lambda_offset <- 1-exp(-1 * lambda_mask)
+# lambda_offset[lambda_offset == 0] <- 1e-6
+# area_rast_mask <- mask(raster::area(lm), global_mask)
+# ## If offset as just area: spp ~ blah + foo + offset(log(area_rast))
+# ## IF offset as area + bias: spp ~ blah + foo + offset(log(off.area_rast)-log(off.bias))
+# 
+# writeRaster(lambda_offset,
+#             filename = file.path(output_dir, "effort_offset_lambda_0360.tif"),
+#             format = "GTiff",overwrite = TRUE)
+# saveRDS(lambda_offset, file.path(output_dir, "effort_offset_lambda_0360.rds"))
+# 
+# writeRaster(area_rast_mask,
+#             filename = file.path(output_dir, "area_offset_0360.tif"),
+#             format = "GTiff", overwrite = TRUE)
+# saveRDS(area_rast_mask,filename = file.path(output_dir, "area_offset_0360.rds"))
+# 
+# ## Add offset to covariate stacks for model and prediction
+# off.bias <- ...
 
 
 
@@ -388,229 +388,230 @@ fit_ppms_apply <- function(i, spdat, bkdat, interaction_terms,
       
       ## !! TO FIX LU VARIABLE - each LU class showing as categorical ####
       ppmform <- formula(paste0(" ~ poly(", paste0(interaction_terms, collapse = ", "),
-                                       ", degree = 2, raw = FALSE) + ", 
-                                       paste0("factor(", factor_terms, collapse = " + ", ")"),  
-                                       paste0(" + poly(", ppm_terms[1:extra_covar],
-                                              ", degree = 2, raw = FALSE)",
-                                              collapse = ""), " + offset(log(off.bias))" ,
-                                       collapse =""))
+                                ", degree = 2, raw = FALSE) + ", 
+                                paste0("factor(", factor_terms, collapse = " + ", ")"),  
+                                paste0(" + poly(", ppm_terms[1:extra_covar],
+                                       ", degree = 2, raw = FALSE)",
+                                       collapse = ""), " + offset(log(off.bias))" ,
+                                collapse =""))
     }
   }
 }
 
-    
-    ## Fit ppm & save output
-    cat(paste("\nFitting ppm model for species ",i , ": ", spp[i], " @ ", Sys.time(), "\n"), 
+
+## Fit ppm & save output
+cat(paste("\nFitting ppm model for species ",i , ": ", spp[i], " @ ", Sys.time(), "\n"), 
+    file = specieslog, append = T)
+cat(paste("   # presence points for species (original) = ", 
+          dim(spxy)[1], "\n"), file = specieslog, append = T)
+cat(paste("   # presence points for species (extracted) = ", 
+          dim(spxyz)[1], "\n\n"), file = specieslog, append = T)
+cat(paste("   # total data points for species (presence + background) = ", 
+          dim(ppmxyz)[1], "\n\n"), file = specieslog, append = T)
+
+if(!modeval){ ## if model_eval == FALSE
+  ## Fit model
+  ppm_mod_start <- Sys.time()
+  
+  mod <- tryCatch(ppmlasso(formula = ppmform, data = ppmxyz, n.fits = n.fits, 
+                           criterion = "bic", standardise = FALSE),
+                  error = function(e){ 
+                    cat(paste("\nModel ",i," for species ", spp[i], " has errors. \n"),
+                        file = specieslog, 
+                        append = T)
+                    return(NA) 
+                  })
+  
+  if(is.na(mod)){
+    cat(paste("\nERROR: Output for model ",i , " for species ", spp[i], " is NA. \n"), 
         file = specieslog, append = T)
-    cat(paste("   # presence points for species (original) = ", 
-              dim(spxy)[1], "\n"), file = specieslog, append = T)
-    cat(paste("   # presence points for species (extracted) = ", 
-              dim(spxyz)[1], "\n\n"), file = specieslog, append = T)
-    cat(paste("   # total data points for species (presence + background) = ", 
-              dim(ppmxyz)[1], "\n\n"), file = specieslog, append = T)
-    
-    if(!modeval){ ## if model_eval == FALSE
-      ## Fit model
-      ppm_mod_start <- Sys.time()
-      
-      mod <- tryCatch(ppmlasso(formula = ppmform, data = ppmxyz, n.fits = n.fits, 
-                               criterion = "bic", standardise = FALSE),
-                      error = function(e){ 
-                        cat(paste("\nModel ",i," for species ", spp[i], " has errors. \n"),
-                            file = specieslog, 
-                            append = T)
-                        return(NA) 
-                      })
-      
-      if(is.na(mod)){
-        cat(paste("\nERROR: Output for model ",i , " for species ", spp[i], " is NA. \n"), 
-            file = specieslog, append = T)
-      }
-      
-      # ## Print warnings to screen (for sequence runs only)
-      # cat('Warnings for ', species_names[i],':\n')
-      # warnings()
-      
-      # ## Capture messages and errors in file (for sequence runs only)
-      # sink(specieslog, type = "message", append = TRUE, split = FALSE)
-      # try(warnings())
-      # ## reset message sink and close the file connection
-      # sink(type="message")
-      # close(specieslog)
-      
-      ## Log run time for model run
-      ppm_mod_end <- Sys.time() - ppm_mod_start
-      cat(paste(">> Run time for ppm model fitting: ", ppm_mod_end, 
-                attr(ppm_mod_end, "units"), "\n"), 
-          file = specieslog, append = T)
-      
-      ## Log time for comparison
-      time_vec <- c(dim(spxy)[1], dim(bkdat)[1], ppm_mod_end, rep(NA, 5))
-      cat(paste(c(i, trimws(gsub(" ", "_", spp[i])), time_vec, "\n"), collapse = ","),
-          file = timelog, append = T)
-      
-      if (output_list == TRUE) {
-        return(mod)
-      } else {
-        saveRDS(mod, paste0(output_dir, "/ppm_out_",gsub(" ","_",species_names[i]),"_",gsub("-", "", Sys.Date()), ".rds"))
-      }
-      
-    } else { ## if model_eval == TRUE
-      
-      ppm_mod_start <- Sys.time()
-      
-      ## Run a basic k-fold for a ppmlasso
-      ## ... Brendan might want to check this
-      nk <- k <- 5 # number of folds
-      kfold_train <- list()
-      kfold_test <- list()
-      rm(folds)
-      
-      ## Sample without replacement 
-      createFolds <- function(x,k){
-        n <- nrow(x)
-        x$folds <- rep(1:k,length.out = n)[sample(n,n)]
-        x
-      }
-      
-      folds <- plyr::ddply(ppmxyz,.(Pres),createFolds,k = nk)
-      for(ii in 1:nk){
-        kfold_test[[ii]]<-folds[folds$folds==ii,] ## dim(folds)[1]/k rows in kfolds_test[[ii]]
-        kfold_train[[ii]]<-folds[folds$folds!=ii,] ## all rows not in kfolds_test[[ii]]
-        # print(colSums(folds[folds$folds==ii,],na.rm = T))
-      }
-      
-      ppmCV <- list()
-      ppmCV_dats <- list()
-      ppmCV_end_kmodels <- c() ## to log time per run
-      
-      ## Fit model
-      ## fit k models with a random (without replacement) basic K-fold
-      for (ii in seq_len(k)){
-        ppmCV_dats[[ii]] <- kfold_train[[ii]]
-        ppmCV[[ii]] <- tryCatch(ppmlasso(formula = ppmform, 
-                                         data = ppmCV_dats[[ii]], 
-                                         n.fits = n.fits, 
-                                         criterion = "bic", 
-                                         standardise = FALSE),
-                                error = function(e){ 
-                                  cat(paste("\n Model",ii,"/",k," for species ", i , ": ", spp[i], " has errors. \n"),
-                                      file = specieslog, 
-                                      append = T)
-                                  return(NA) 
-                                })
-        
-        ppmCV_end <- Sys.time()
-        
-        if(is.na(ppmCV[[ii]])){
-          cat(paste("\nERROR: Output for model ",ii,"/",k," for species ", i , ": ", spp[i], " is NA. \n"), 
-              file = specieslog, append = T)
-          stop("\nERROR: Output for model ",ii,"/",k," for species ", i , ": ", spp[i], " is NA \n")
-        } else {
-          cat(paste("\nModel",ii,"/",k, " done @ ", ppmCV_end, "\n"),
-              file = specieslog, append = T)
-        }
-        ppmCV_end_kmodels[[i]] <- ppmCV_end
-      }
-      
-      ## Log run time for k models run
-      ppm_mod_end <- Sys.time() - ppm_mod_start
-      cat(paste(">> Run time for all", k," models for species ",
-                i , ": ", ppm_mod_end, 
-                attr(ppm_mod_end, "units"), "\n"), 
-          file = specieslog, append = T)
-      
-      ## Model evaluation with training data
-      ppm_traineval_start <- Sys.time()
-      
-      cat(paste("\n\nModel evaluation with training data: ", Sys.time(), "\n"), 
-          file = specieslog, append = T)
-      
-      cell_area <- prod(res(global_mask))
-      train.preds <- lapply(1:k,function(x)predict(ppmCV[[x]],
-                                                   newdata=ppmCV_dats[[x]])*cell_area)
-      model.evaluations <- lapply(1:k,function(x)dismo::evaluate(train.preds[[x]][ppmCV_dats[[x]]$Pres==1],
-                                                                 train.preds[[x]][ppmCV_dats[[x]]$Pres==0]))
-      
-      # mean AUC from k-folds the model
-      train.meanAUC <- mean(sapply(model.evaluations,function(x)x@auc))
-      
-      # ## ROC curves
-      # par(mfrow=c(3,2))
-      # sapply(1:k,function(ii)plot(model.evaluations[[ii]],"ROC"))
-      # 
-      # ## TPR plots
-      # par(mfrow=c(3,2))
-      # sapply(1:k,function(ii)plot(model.evaluations[[ii]],"TPR"))
-      # 
-      # ## Density plots
-      # par(mfrow=c(3,2))
-      # sapply(1:k,function(ii)density(model.evaluations[[ii]]))
-      
-      ## Log run time for evaluation using training data
-      ppm_traineval_end <- Sys.time() - ppm_traineval_start
-      cat(paste(">> Run time for model evaluation with training data: ", 
-                ppm_traineval_end, attr(ppm_traineval_end, "units"), "\n"), 
-          file = specieslog, append = T)
-      
-      
-      ## Model evaluations with test data
-      ppm_testeval_start <- Sys.time()
-      
-      cat(paste("\n\nModel evaluation with test data: ", Sys.time(), "\n"), 
-          file = specieslog, append = T)
-      
-      test.preds <- lapply(1:k,function(x)predict(ppmCV[[x]],
-                                                  newdata=kfold_test[[x]])*cell_area)
-      test.evaluations <- lapply(1:k,function(x)dismo::evaluate(test.preds[[x]][kfold_test[[x]]$Pres==1],
-                                                                test.preds[[x]][kfold_test[[x]]$Pres==0]))
-      
-      
-      ## Mean AUC from k-folds the model
-      test.meanAUC <- mean(sapply(test.evaluations,function(x)x@auc))
-      
-      # ## ROC curves
-      # par(mfrow=c(3,2))
-      # sapply(1:k,function(ii)plot(test.evaluations[[ii]],"ROC"))
-      # 
-      # ## TPR plots
-      # par(mfrow=c(3,2))
-      # sapply(1:k,function(ii)plot(test.evaluations[[ii]],"TPR"))
-      # 
-      # ## Density plots
-      # par(mfrow=c(3,2))
-      # sapply(1:k,function(ii)density(model.evaluations[[ii]]))
-      
-      ## Log run time for evaluation using test data
-      ppm_testeval_end <- Sys.time() - ppm_testeval_start
-      cat(paste(">> Run time for model evaluation with test data: ", 
-                ppm_testeval_end, attr(ppm_testeval_end, "units"), "\n"), 
-          file = specieslog, append = T)
-      
-      ## Save output
-      mod <- list(ppmCV = ppmCV, 
-                  train_eval = model.evaluations, 
-                  train_AUC = train.meanAUC, 
-                  test_eval = test.evaluations,
-                  test_AUC = test.meanAUC)
-      
-      ## Log time for comparison
-      time_vec <- c(dim(spxy)[1], dim(bkdat)[1], NA, mean(ppmCV_end_kmodels), 
-                    ppm_mod_end, ppm_traineval_end, ppm_testeval_end, NA)
-      cat(paste(c(i, trimws(gsub(" ", "_", spp[i])), time_vec, "\n"), collapse = ","),
-          file = timelog, append = T)
-      
-      gc()
-      
-      if (output_list == TRUE) {
-        return(mod)
-      } else {
-        saveRDS(mod, paste0(output_dir, "/ppm_out_",gsub(" ","_",species_names[i]),"_",gsub("-", "", Sys.Date()), ".rds"))
-        out <- list(likelihood = sapply(mod$ppmCV, `[[`, 8), train_AUC = mod$train_AUC, test_AUC = mod$test_AUC)
-        return(out)
-      }
-    }
   }
+  
+  # ## Print warnings to screen (for sequence runs only)
+  # cat('Warnings for ', species_names[i],':\n')
+  # warnings()
+  
+  # ## Capture messages and errors in file (for sequence runs only)
+  # sink(specieslog, type = "message", append = TRUE, split = FALSE)
+  # try(warnings())
+  # ## reset message sink and close the file connection
+  # sink(type="message")
+  # close(specieslog)
+  
+  ## Log run time for model run
+  ppm_mod_end <- Sys.time() - ppm_mod_start
+  cat(paste(">> Run time for ppm model fitting: ", ppm_mod_end, 
+            attr(ppm_mod_end, "units"), "\n"), 
+      file = specieslog, append = T)
+  
+  ## Log time for comparison
+  time_vec <- c(dim(spxy)[1], dim(bkdat)[1], ppm_mod_end, rep(NA, 5))
+  cat(paste(c(i, trimws(gsub(" ", "_", spp[i])), time_vec, "\n"), collapse = ","),
+      file = timelog, append = T)
+  
+  if (output_list == TRUE) {
+    return(mod)
+  } else {
+    saveRDS(mod, paste0(output_dir, "/ppm_out_",gsub(" ","_",species_names[i]),"_",gsub("-", "", Sys.Date()), ".rds"))
+  }
+  
+} else { ## if model_eval == TRUE
+  
+  ppm_mod_start <- Sys.time()
+  
+  ## Model evaluatiuon
+  ## Run a basic k-fold for a ppmlasso
+  ## ... Brendan might want to check this
+  nk <- k <- 5 # number of folds
+  kfold_train <- list()
+  kfold_test <- list()
+  rm(folds)
+  
+  ## Sample without replacement 
+  createFolds <- function(x,k){
+    n <- nrow(x)
+    x$folds <- rep(1:k,length.out = n)[sample(n,n)]
+    x
+  }
+  
+  folds <- plyr::ddply(ppmxyz,.(Pres),createFolds,k = nk)
+  for(ii in 1:nk){
+    kfold_test[[ii]]<-folds[folds$folds==ii,] ## dim(folds)[1]/k rows in kfolds_test[[ii]]
+    kfold_train[[ii]]<-folds[folds$folds!=ii,] ## all rows not in kfolds_test[[ii]]
+    # print(colSums(folds[folds$folds==ii,],na.rm = T))
+  }
+  
+  ppmCV <- list()
+  ppmCV_dats <- list()
+  ppmCV_end_kmodels <- c() ## to log time per run
+  
+  ## Fit model
+  ## fit k models with a random (without replacement) basic K-fold
+  for (ii in seq_len(k)){
+    ppmCV_dats[[ii]] <- kfold_train[[ii]]
+    ppmCV[[ii]] <- tryCatch(ppmlasso(formula = ppmform, 
+                                     data = ppmCV_dats[[ii]], 
+                                     n.fits = n.fits, 
+                                     criterion = "bic", 
+                                     standardise = FALSE),
+                            error = function(e){ 
+                              cat(paste("\n Model",ii,"/",k," for species ", i , ": ", spp[i], " has errors. \n"),
+                                  file = specieslog, 
+                                  append = T)
+                              return(NA) 
+                            })
+    
+    ppmCV_end <- Sys.time()
+    
+    if(is.na(ppmCV[[ii]])){
+      cat(paste("\nERROR: Output for model ",ii,"/",k," for species ", i , ": ", spp[i], " is NA. \n"), 
+          file = specieslog, append = T)
+      stop("\nERROR: Output for model ",ii,"/",k," for species ", i , ": ", spp[i], " is NA \n")
+    } else {
+      cat(paste("\nModel",ii,"/",k, " done @ ", ppmCV_end, "\n"),
+          file = specieslog, append = T)
+    }
+    ppmCV_end_kmodels[[i]] <- ppmCV_end
+  }
+  
+  ## Log run time for k models run
+  ppm_mod_end <- Sys.time() - ppm_mod_start
+  cat(paste(">> Run time for all", k," models for species ",
+            i , ": ", ppm_mod_end, 
+            attr(ppm_mod_end, "units"), "\n"), 
+      file = specieslog, append = T)
+  
+  ## Model evaluation with training data
+  ppm_traineval_start <- Sys.time()
+  
+  cat(paste("\n\nModel evaluation with training data: ", Sys.time(), "\n"), 
+      file = specieslog, append = T)
+  
+  cell_area <- prod(res(global_mask))
+  train.preds <- lapply(1:k,function(x)predict(ppmCV[[x]],
+                                               newdata=ppmCV_dats[[x]])*cell_area)
+  model.evaluations <- lapply(1:k,function(x)dismo::evaluate(train.preds[[x]][ppmCV_dats[[x]]$Pres==1],
+                                                             train.preds[[x]][ppmCV_dats[[x]]$Pres==0]))
+  
+  # mean AUC from k-folds the model
+  train.meanAUC <- mean(sapply(model.evaluations,function(x)x@auc))
+  
+  # ## ROC curves
+  # par(mfrow=c(3,2))
+  # sapply(1:k,function(ii)plot(model.evaluations[[ii]],"ROC"))
+  # 
+  # ## TPR plots
+  # par(mfrow=c(3,2))
+  # sapply(1:k,function(ii)plot(model.evaluations[[ii]],"TPR"))
+  # 
+  # ## Density plots
+  # par(mfrow=c(3,2))
+  # sapply(1:k,function(ii)density(model.evaluations[[ii]]))
+  
+  ## Log run time for evaluation using training data
+  ppm_traineval_end <- Sys.time() - ppm_traineval_start
+  cat(paste(">> Run time for model evaluation with training data: ", 
+            ppm_traineval_end, attr(ppm_traineval_end, "units"), "\n"), 
+      file = specieslog, append = T)
+  
+  
+  ## Model evaluations with test data
+  ppm_testeval_start <- Sys.time()
+  
+  cat(paste("\n\nModel evaluation with test data: ", Sys.time(), "\n"), 
+      file = specieslog, append = T)
+  
+  test.preds <- lapply(1:k,function(x)predict(ppmCV[[x]],
+                                              newdata=kfold_test[[x]])*cell_area)
+  test.evaluations <- lapply(1:k,function(x)dismo::evaluate(test.preds[[x]][kfold_test[[x]]$Pres==1],
+                                                            test.preds[[x]][kfold_test[[x]]$Pres==0]))
+  
+  
+  ## Mean AUC from k-folds the model
+  test.meanAUC <- mean(sapply(test.evaluations,function(x)x@auc))
+  
+  # ## ROC curves
+  # par(mfrow=c(3,2))
+  # sapply(1:k,function(ii)plot(test.evaluations[[ii]],"ROC"))
+  # 
+  # ## TPR plots
+  # par(mfrow=c(3,2))
+  # sapply(1:k,function(ii)plot(test.evaluations[[ii]],"TPR"))
+  # 
+  # ## Density plots
+  # par(mfrow=c(3,2))
+  # sapply(1:k,function(ii)density(model.evaluations[[ii]]))
+  
+  ## Log run time for evaluation using test data
+  ppm_testeval_end <- Sys.time() - ppm_testeval_start
+  cat(paste(">> Run time for model evaluation with test data: ", 
+            ppm_testeval_end, attr(ppm_testeval_end, "units"), "\n"), 
+      file = specieslog, append = T)
+  
+  ## Save output
+  mod <- list(ppmCV = ppmCV, 
+              train_eval = model.evaluations, 
+              train_AUC = train.meanAUC, 
+              test_eval = test.evaluations,
+              test_AUC = test.meanAUC)
+  
+  ## Log time for comparison
+  time_vec <- c(dim(spxy)[1], dim(bkdat)[1], NA, mean(ppmCV_end_kmodels), 
+                ppm_mod_end, ppm_traineval_end, ppm_testeval_end, NA)
+  cat(paste(c(i, trimws(gsub(" ", "_", spp[i])), time_vec, "\n"), collapse = ","),
+      file = timelog, append = T)
+  
+  gc()
+  
+  if (output_list == TRUE) {
+    return(mod)
+  } else {
+    saveRDS(mod, paste0(output_dir, "/ppm_out_",gsub(" ","_",species_names[i]),"_",gsub("-", "", Sys.Date()), ".rds"))
+    out <- list(likelihood = sapply(mod$ppmCV, `[[`, 8), train_AUC = mod$train_AUC, test_AUC = mod$test_AUC)
+    return(out)
+  }
+}
+}
 }
 
 
