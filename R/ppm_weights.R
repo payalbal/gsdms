@@ -17,19 +17,19 @@
 #' path <- system.file("extdata", package = "ppmData")
 #' lst <- list.files(path=path,pattern='*.tif',full.names = TRUE)
 #' window <- terra::rast(lst[1])
-#' res <- random_background_points_and_weights(window,10000)
+#' res <- random_background_points(window,10000)
 #' plot(window)
 #' points(res[,1:2],pch=".")
 
 
-random_background_points_and_weights <- function(window = NULL,
-                                            npoints = 10000,
-                                            unit = "km"){
+random_background_points <- function(window = NULL,
+                                                 npoints = 10000,
+                                                 unit = "km"){
   
   if(is.null(window)) stop("This function requires a window (terra raster) to work.")
   if(class(window)[1]!="SpatRaster") stop("'window' needs to be a 'SpatRaster' from the 'terra' package.")
   
-   background_sites <- terra::spatSample(x = window,
+  background_sites <- terra::spatSample(x = window,
                            size = npoints,
                            na.rm = TRUE,
                            as.df = TRUE,
