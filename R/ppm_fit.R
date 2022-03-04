@@ -12,16 +12,19 @@ form_spp <- y/wts ~ 1 + blah + foo
 form_bias <- ~ -1 + bias1 + bias2
 
 
-ppm.fit <- function(x, y, wts, method=c("glm","gam","glmnet","gibbs"), control=list()){
+ppm.fit <- function(x, y, wts, method=c("glm","gam","lasso","ridge","gibbs"),lambda=NULL, control=list()){
+  
+  # lambda will be a vector of 
   
   if(method=="glm")
     ft <- glm.fit(x = x ,y = y/wts, weights = wts, family = poisson())
   if(method=="gam"){
-    
     ft <- mgcv::gam(formula = ,data = cbind(x,y),weights = wts,family = poisson() )
   }
-  if(method=="glmnet")
-    ft <- glmnet::glmnet(x=y, y=y/wts, weights = wts, family = "poisson")
+  if(method=="lasso")
+    ft <- glmnet::glmnet(x=y, y=y/wts, weights = wts, family = "poisson", alpha = 1) #lasso
+  if(method=="ridge")
+    ft <- glmnet::glmnet(x=y, y=y/wts, weights = wts, family = "poisson", alpha = 0) #lasso
   if(method=="gibbs")
     ft <- glm.fit(x = x, y = y/wts, weights = wts, family = binomial())
   else 

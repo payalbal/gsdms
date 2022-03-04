@@ -1,6 +1,6 @@
 # quick and dirty way to generate random points for weighted poisson regression
 
-#' @title psuedo_random_background_weights
+#' @title random_background_weights
 #' @description Quick way to generate psuedo-random points using the terria 
 #' package. Weights are taken as the the area(window)/npoints. The default unit 
 #' is km^2, but other units can be used such as meters squared "m" or hectars 
@@ -13,15 +13,16 @@
 #' but meters squared "m" or hectars "ha" can be used.  
 #' @examples 
 #' library(ppmData)
+#' library(terra)
 #' path <- system.file("extdata", package = "ppmData")
 #' lst <- list.files(path=path,pattern='*.tif',full.names = TRUE)
 #' window <- terra::rast(lst[1])
-#' res <- random_background_weights(window,10000)
+#' res <- random_background_points_and_weights(window,10000)
 #' plot(window)
 #' points(res[,1:2],pch=".")
 
 
-psuedo_random_background_points <- function(window = NULL,
+random_background_points_and_weights <- function(window = NULL,
                                             npoints = 10000,
                                             unit = "km"){
   
