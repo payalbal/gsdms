@@ -48,9 +48,13 @@ random_background_points <- function(window = NULL,
    
    window_area <- terra::global(areas, "sum", na.rm=TRUE)
    
-   bck_wts <- rep(as.numeric(window_area)/npoints,npoints)
-   
-   res <- data.frame(background_sites[,-3],weights=bck_wts)
+   if(is.lonlat(window)){
+      bck_wts <- terra::extract(areas,background_sites[,-3])
+      res <- data.frame(background_sites[,-3],weights=bck_wts[,-1])
+   }else{
+      bck_wts <- rep(as.numeric(window_area)/npoints,npoints)
+      res <- data.frame(background_sites[,-3],weights=bck_wts)
+   }
    
    return(res)
   
