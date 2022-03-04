@@ -179,15 +179,8 @@ predxyz <- fread(file.path(input_dir, "covariates_predict_rcp85.csv"))
 ## Add offset
 predxyz <- cbind(covs_predict, off.bias)
 
-
-
 ## >> Check that NA syncs across all covariate layers ####
 ## use gdal_calc function if NAs need to be synced
-
-
-
-
-
 
 ## Define model parameters ####
 ## >> Specify covariates with interactions ###
