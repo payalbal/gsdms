@@ -22,22 +22,33 @@
 #' points(res[,1:2],pch=".")
 
 
+# r.list <- list.files("/home/woo457/unimelb_local/data/global/elevation/",full.names = TRUE)
+# window <- terra::rast(r.list)
+
+## probably need to deal with no equal area issue. 
+## If cells not eq. area then need to extract the cell area per point
+
 random_background_points <- function(window = NULL,
-                                                 npoints = 10000,
-                                                 unit = "km"){
+                                     npoints = 10000,
+                                     unit = "km"){
+   
+   require(terra)
   
   if(is.null(window)) stop("This function requires a window (terra raster) to work.")
   if(class(window)[1]!="SpatRaster") stop("'window' needs to be a 'SpatRaster' from the 'terra' package.")
   
-  background_sites <- terra::spatSample(x = window,
+   background_sites <- terra::spatSample(x = window,
                            size = npoints,
                            na.rm = TRUE,
                            as.df = TRUE,
                            xy = TRUE)
    
-   window_area <- terra::expanse(window, unit = unit)
+   ## expanse broke for large raster
+   areas <- terra::cellSize(window, unit="km")
    
-   bck_wts <- rep(window_area/npoints,npoints)
+   window_area <- terra::global(areas, "sum", na.rm=TRUE)
+   
+   bck_wts <- rep(as.numeric(window_area)/npoints,npoints)
    
    res <- data.frame(background_sites[,-3],weights=bck_wts)
    
