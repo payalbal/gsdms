@@ -32,7 +32,7 @@ random_background_points <- function(window = NULL,
                                      npoints = 10000,
                                      unit = "km"){
    
-   require(terra)
+  require(terra)
   
   if(is.null(window)) stop("This function requires a window (terra raster) to work.")
   if(class(window)[1]!="SpatRaster") stop("'window' needs to be a 'SpatRaster' from the 'terra' package.")
