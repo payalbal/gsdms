@@ -1,25 +1,13 @@
 
-x <- c('rgdal', 'geostuff', 'tools', 'bitops', 
-       'RCurl', 'gdalUtils', 'usethis',
-       'parallel', 'doMC')
+rm(list = ls())
+gc()
+x <- c('bitops', 'RCurl', 'rstudioapi')
 lapply(x, require, character.only = TRUE)
 rm(x)
 
+data_dir <- "/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data"
 
-mc.cores = future::availableCores()-2
-proj.res.km <- 10
-data_dir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data"
-output_dir <- file.path(data_dir, "outputs", sprintf("layers_%sk", proj.res.km))
-
-biofuture <- list.files("/home/payalb/gsdms_r_vol/tempdata/research-cifs/proj-2200_nature_futures21-1128.4.411/global/cmip6/bio/mean", full.names = TRUE, recursive = TRUE)
-
-
-infiles = biofuture
-outfiles = file.path(output_dir, paste0(tools::file_path_sans_ext(basename(infiles)), "_clip.", tools::file_ext(infiles)))
-new_extent <- "-180 -60 180 90"
-
-parallel::mclapply(seq_along(infiles),
-                   function(x) system(paste0("gdalwarp -overwrite -ot Byte",
-                                             " -te ", new_extent, " ",
-                                             infiles[x], " ", outfiles[x])),
-                   mc.cores = mc.cores, mc.preschedule = TRUE)
+input_files <- file.path(data_dir, "CHELSA", "bio_future_urls.txt")
+target_folder <- file.path(data_dir, "CHELSA", "future", "raw")
+system(sprintf("wget --no-host-directories --force-directories --input-file=%s -P %s", input_files, target_folder))
+list.files(target_folder)

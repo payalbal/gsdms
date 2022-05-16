@@ -31,15 +31,27 @@ mc.cores = future::availableCores()-2
 
 luvars <- c("primf", "primn", "secdf", "secdn", "urban", "pastr", "range", "crop" )
 
-## Folder paths
-data_dir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data"
+## >> Projections ####
+## >> For mapping
+# map_crs <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+
+## >> For analyses: Equal Earth
+## Ref for EE: https://proj.org/operations/projections/eqearth.html#id2
+## jgarber note the '+proj=eqearth' is a new format and wont work wth gdalUtils
+## instead we use '+proj=eqearth +ellips=WGS84 +wktext' which give equal earth and works here
+## see: https://en.wikipedia.org/wiki/Equal_Earth_projection
+new_crs = '+proj=eqearth +ellips=WGS84 +wktext'
+
+
+## >> Folder paths ####
+data_dir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data"
 output_dir <- file.path(data_dir, "outputs", sprintf("layers_%sk", proj.res.km))
 if(!dir.exists(output_dir)) {
   dir.create(output_dir)
 }
 
 
-## Functions
+## >> Functions ####
 source("/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/scripts/0_functions.R")
 source("/home/payalb/gsdms_r_vol/tempdata/workdir/landuse_projects/land-use/gdal_calc.R") # by jgarber
 
@@ -82,10 +94,6 @@ raster(outfile)
 
 
 ## step three_reproject mask to Equal Earth and desired resolution
-## Ref for EE: https://proj.org/operations/projections/eqearth.html#id2
-## jgarber note the '+proj=eqearth' is a new format and wont work wth gdalUtils
-## instead we use '+proj=eqearth +ellips=WGS84 +wktext' which give equal earth and works here
-## see: https://en.wikipedia.org/wiki/Equal_Earth_projection
 infile <- outfile
 outfile <- gsub("_clip", "_ee", infile)
 new_res <- c(proj.res.km*1000, proj.res.km*1000)
@@ -218,7 +226,7 @@ raster(file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km)))
 ## >> step five_Mask layers ####
 ## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R
 infile <- outfile
-outfile <- sub(".tif", "_eqar.tif", outfile)
+outfile <- sub(".tif", "_ee.tif", outfile)
 mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))
 
 gdalUtils::gdalinfo(mask_file)
@@ -238,72 +246,25 @@ file.remove(infile)
 
 
 
+
 ## ------------------------------------------------------------------------- ##
-## Prepare Worldlim GCM data quartile layers - TO FIX. SKIP. USE CHELSA. ####
+## Prepare CHELSA future layers - Interpolate between y_0 and y_end ####
+## TO DO YET ####
 ## ------------------------------------------------------------------------- ##
-# ## ALL GCMs
-# ## Source: from regSSP scripts
-# ## *** replace with gdal functions...
-# rcps <- c("45", "60", "85")
-# models <- c("BC", "CC", "GS", "HD", "HE", "IP", "MI", "MR", "MC", "MG", "NO")
-# 
-# mask_file <- file.path(data_dir, "global_mask_ee.tif")
-# gcm_files <- list.files(file.path(data_dir, 'gcm_30s'), full.names = T, recursive = T)
-# gcm_masked_path <- file.path(processed_dir, 'gcm_masked')
-# if(!dir.exists(gcm_masked_path)){dir.create(gcm_masked_path)}
-# 
-# 
-# ## Mask data & stack by GCM
-# global_mask <- raster(mask_file)
-# for(model_i in models){
-#   mod_stack <- list()
-#   file_mod <- files_gcm[grepl(model_i, files_gcm)]
-#   for(j in 1:length(rcps)){
-#     file_mod_rcp <- file_mod[grepl(rcps[j], file_mod)]
-#     rcp_stack <- list()
-#     for(f in 1:length(file_mod_rcp)){
-#       rcp_stack[[f]] <- mask(crop(raster(file_mod_rcp[f]), global_mask), global_mask)
-#     }
-#     mod_stack[[j]] <- readAll(brick(rcp_stack))
-#   }
-#   saveRDS(mod_stack, file = paste0(gcm_reg_path, "/", model_i, ".rds"))
-# }
-# rm(rcp_stack, mod_stack)
-# 
-# ## Extract cell-wise quartiles across GCM
-# quartiles <- c("q1", "q2", "q3")
-# gcm_files <- list.files(gcm_masked_path, full.names = T)
-# gcm_quant_path <- file.path(processed_dir, 'gcm_quant')
-# if(!dir.exists(gcm_quant_path)){dir.create(gcm_quant_path)}
-# 
-# inds <- which(!is.na(global_mask[]))
-# 
-# for(j in 1:length(rcps)){
-#   saveRDS(stack(), file = paste0(gcm_quant_path, "/bio", "q1_", rcps[j], ".rds"))
-#   saveRDS(stack(), file = paste0(gcm_quant_path, "/bio", "q2_", rcps[j], ".rds"))
-#   saveRDS(stack(), file = paste0(gcm_quant_path, "/bio", "q3_", rcps[j], ".rds"))
-#   print(paste0("processing rcp", rcps[j]))
-#   for(k in 1:19){
-#     print(paste0("processing bioclim var: ", k))
-#     bio <- stack()
-#     for(i in 1:length(models)){
-#       print(paste0("processing model: ", i))
-#       dat <- readRDS(gcm_files[[i]])[[j]]
-#       bio <- stack(bio, dat[[k]])
-#     }
-#     
-#     print(paste0("getting quartiles..."))
-#     df1 <- na.omit(as.matrix(getValues(bio)))
-#     c <-rowQuantiles(df1, probs = c(0.25, 0.5, 0.75))
-#     for(m in 1:3){
-#       bioclim <- readRDS(file = paste0(gcm_quant_path, "/bio", quartiles[m], "_", rcps[j], ".rds"))
-#       r[inds] <- c[,m]
-#       names(r) <- paste0("bio", k)
-#       saveRDS(readAll(stack(bioclim, r)), file = paste0(gcm_quant_path, "/bio", quartiles[m], "_", rcps[j], ".rds"))
-#     }
-#   }
-# }
-# unlink(gcm_masked_path, recursive=T)
+## CHELSA future
+# biofuture <- list.files("/home/payalb/gsdms_r_vol/tempdata/research-cifs/proj-2200_nature_futures21-1128.4.411/global/cmip6/bio/mean", full.names = TRUE, recursive = TRUE)
+biofuture <- list.files(file.path(data_dir, "CHELSA/future/mean"), full.names = TRUE, recursive = TRUE)
+gdalinfo(biofuture[1])
+
+## >> >> Rename files
+# file.rename(biofuture, gsub("_V.2.1.tif$", ".tif", biofuture))
+
+biofuture <- list.files(file.path(data_dir, "CHELSA/future/mean"),
+                        full.names = TRUE, recursive = TRUE)
+biofuture_ssp1 <- grep("ssp1", biofuture, value = TRUE) 
+## 19 vars * 3 time steps = 57 files
+biofuture_ssp3 <- grep("ssp3", biofuture, value = TRUE) 
+biofuture_ssp5 <- grep("ssp5", biofuture, value = TRUE) 
 
 
 
@@ -311,7 +272,7 @@ file.remove(infile)
 ## ------------------------------------------------------------------------- ##
 ## Prepare distance layers ####
 ## ------------------------------------------------------------------------- ##
-dst_folder <- file.path(data_dir, "distance_layers")
+dst_folder <- file.path(data_dir, "distance_layers_wgs")
 if(!dir.exists(dst_folder)) {
   dir.create(dst_folder)
 }
@@ -322,11 +283,12 @@ infile <- file.path(data_dir, "builtup", "GHS_BUILT_LDS2014_GLOBE_R2018A_54009_1
 gdalinfo(infile)
 
 ## Convert Projection
-t_crs <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
-outfile <- gsub(".tif$", "_wgs.tif", infile)
+new_crs <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+outfile <- gsub(".tif$", "_mollweide.tif", infile)
 system(sprintf("gdalwarp -overwrite -ot Byte -r bilinear -s_srs '%s' -t_srs '%s' %s %s",
-               t_crs, wgs_crs, infile, outfile))
+               new_crs, wgs_crs, infile, outfile))
 gdalinfo(outfile)
+
 ## Calculate distance layer
 infile <- outfile
 outfile <- file.path(dst_folder, "dst_builtup.tif")
@@ -419,6 +381,8 @@ wgs_crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 system(sprintf("gdalwarp -overwrite -ot Byte -t_srs '%s' %s %s",
                wgs_crs, infile, outfile))
 
+file.remove(infile)
+file.rename(outfile, infile)
 
 ## >> >> Wetlands ####
 ## >> >> Extract wetlands from data
@@ -442,6 +406,8 @@ wgs_crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 system(sprintf("gdalwarp -overwrite -ot Byte -t_srs '%s' %s %s",
                wgs_crs, infile, outfile))
 
+file.remove(infile)
+file.rename(outfile, infile)
 
 ## >> Protected areas ####
 ## Distance is calculated from all non 0 values (only 1 and 0 values in this layer)
@@ -473,7 +439,6 @@ lapply(soil, gdalsrsinfo, as.CRS = TRUE)
 gdalinfo(soil[1])
 
 ## >> >> Specify projection
-
 wgs_crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" 
 mclapply(seq_along(soil),
          function(x) system(sprintf("gdalwarp -overwrite -ot Byte -t_srs '%s' %s %s",
@@ -513,15 +478,6 @@ kgvars <- grep("CHELSA_kg", biocurrent, value = TRUE)
 biocurrent <- grep("CHELSA_bio", biocurrent, value = TRUE)
 
 
-## CHELSA future
-# biofuture <- list.files("/home/payalb/gsdms_r_vol/tempdata/research-cifs/proj-2200_nature_futures21-1128.4.411/global/cmip6/bio/mean", full.names = TRUE, recursive = TRUE)
-biofuture <- list.files(file.path(data_dir, "CHELSA/future/mean"), full.names = TRUE, recursive = TRUE)
-gdalinfo(biofuture[1])
-
-## >> >> Rename files
-# file.rename(biofuture, gsub("_V.2.1.tif$", ".tif", biofuture))
-
-
 ## Hansen treecover
 tree <- list.files(file.path(data_dir, "Hansen_treecover"), 
                    pattern = ".tif$", full.names = TRUE)
@@ -530,17 +486,16 @@ gdalsrsinfo(tree)
 
 
 ## Distance layers
-dst_layers <- list.files(file.path(data_dir, "distance_layers"),
+dst_layers <- list.files(file.path(data_dir, "distance_layers_wgs"),
                          full.names = TRUE)
-dst_layers <- dst_layers[-c(3,8)]
-gdalinfo(dst_layers[4])
+gdalinfo(dst_layers[6])
 lapply(dst_layers, gdalsrsinfo)
 
 
 
 ## >> Combine filenames ####
-cov_files <- c(biocurrent, biofuture, 
-               kgvars, srtm, soil, tree, dst_layers)
+cov_files <- c(biocurrent, kgvars, 
+               srtm, soil, tree, dst_layers)
 all(lapply(cov_files, file.exists))
 
 
@@ -572,16 +527,16 @@ x <- outfiles
 infiles <- outfiles[26:37]
 lapply(infiles, gdalsrsinfo)
 
-outfiles <- gsub("_clip", "_temp", infiles)
+outfiles <- gsub("_clip", "_reproj1", infiles)
 parallel::mclapply(seq_along(infiles),
                    function(x) system(sprintf("gdal_translate -ot Byte -a_srs 'EPSG:4326' %s %s",
                                               infiles[x], outfiles[x])),
                    mc.cores = mc.cores, mc.preschedule = TRUE)
-  ## this step is nneeded to resolve the error: ERROR 1: Too many points (xx out of xx) failed to transform, unable to compute output bounds. Warning 1: Unable to compute source region for output window x,x,x,x, skipping.
+  ## this step is needed to resolve the error: ERROR 1: Too many points (xx out of xx) failed to transform, unable to compute output bounds. Warning 1: Unable to compute source region for output window x,x,x,x, skipping.
 
 
 infiles <- outfiles
-outfiles <- gsub("_clip", "_ee", infiles)
+outfiles <- gsub("_reproj1", "_reproj2", infiles)
 new_res <- c(proj.res.km*1000, proj.res.km*1000)
 wgs_crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0" 
 new_crs = '+proj=eqearth +ellips=WGS84 +wktext'
@@ -611,7 +566,7 @@ lapply(outfiles, gdalsrsinfo)
 
 ## >> step three_Clip to make #cells equal between mask and layer ####
 infiles <- outfiles
-outfiles <- sub("_ee", "_clip2", outfiles)
+outfiles <- sub("_reproj2", "_clip2", outfiles)
 mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))
 new_extent <- extent(raster(mask_file))
 
@@ -633,7 +588,7 @@ file.remove(infiles)
 ## >> step four_Mask layers ####
 ## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R
 infiles <- outfiles
-outfiles <- sub("_clip2", "_eqar", outfiles)
+outfiles <- sub("_clip2", "_ee", outfiles)
 mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))
 
 gdalUtils::gdalinfo(mask_file)
@@ -746,19 +701,6 @@ outfile <- gsub("srtm", "roughness", infile)
 system(paste0("gdaldem roughness ", infile, " ", outfile))
 
 file.rename(infile, gsub("srtm", "elevation", infile))
-
-
-
-## ------------------------------------------------------------------------- ##
-## Prepare CHELSA future layers - Interpolate between y_0 and y_end ####
-## ------------------------------------------------------------------------- ##
-
-biofuture <- list.files(file.path(data_dir, "CHELSA/future/mean"),
-                        full.names = TRUE, recursive = TRUE)
-biofuture_ssp1 <- grep("ssp1", biofuture, value = TRUE) 
-## 19 vars * 3 time steps = 57 files
-biofuture_ssp3 <- grep("ssp3", biofuture, value = TRUE) 
-biofuture_ssp5 <- grep("ssp5", biofuture, value = TRUE) 
 
 
 
@@ -1161,3 +1103,73 @@ file.remove(c(gsub(".tif", "_edt.tif", outfile), gsub(".tif", "_temp.tif", outfi
 # 
 # system(sprintf("gdal_proximity.py %s %s -values %d -of GTiff -distunits GEO -nodata %d -co compress=LZW -co BIGTIFF=YES", infile, outfile, ..., -9999))
 # gdalinfo(outfile)
+
+
+
+# ## OLD CLIMATE DATA
+# ## ------------------------------------------------------------------------- ##
+# ## Prepare Worldlim GCM data quartile layers - TO FIX. USE CHELSA. ####
+# ## ------------------------------------------------------------------------- ##
+# ## ALL GCMs
+# ## Source: from regSSP scripts
+# ## *** replace with gdal functions...
+# rcps <- c("45", "60", "85")
+# models <- c("BC", "CC", "GS", "HD", "HE", "IP", "MI", "MR", "MC", "MG", "NO")
+# 
+# mask_file <- file.path(data_dir, "global_mask_ee.tif")
+# gcm_files <- list.files(file.path(data_dir, 'gcm_30s'), full.names = T, recursive = T)
+# gcm_masked_path <- file.path(processed_dir, 'gcm_masked')
+# if(!dir.exists(gcm_masked_path)){dir.create(gcm_masked_path)}
+# 
+# 
+# ## Mask data & stack by GCM
+# global_mask <- raster(mask_file)
+# for(model_i in models){
+#   mod_stack <- list()
+#   file_mod <- files_gcm[grepl(model_i, files_gcm)]
+#   for(j in 1:length(rcps)){
+#     file_mod_rcp <- file_mod[grepl(rcps[j], file_mod)]
+#     rcp_stack <- list()
+#     for(f in 1:length(file_mod_rcp)){
+#       rcp_stack[[f]] <- mask(crop(raster(file_mod_rcp[f]), global_mask), global_mask)
+#     }
+#     mod_stack[[j]] <- readAll(brick(rcp_stack))
+#   }
+#   saveRDS(mod_stack, file = paste0(gcm_reg_path, "/", model_i, ".rds"))
+# }
+# rm(rcp_stack, mod_stack)
+# 
+# ## Extract cell-wise quartiles across GCM
+# quartiles <- c("q1", "q2", "q3")
+# gcm_files <- list.files(gcm_masked_path, full.names = T)
+# gcm_quant_path <- file.path(processed_dir, 'gcm_quant')
+# if(!dir.exists(gcm_quant_path)){dir.create(gcm_quant_path)}
+# 
+# inds <- which(!is.na(global_mask[]))
+# 
+# for(j in 1:length(rcps)){
+#   saveRDS(stack(), file = paste0(gcm_quant_path, "/bio", "q1_", rcps[j], ".rds"))
+#   saveRDS(stack(), file = paste0(gcm_quant_path, "/bio", "q2_", rcps[j], ".rds"))
+#   saveRDS(stack(), file = paste0(gcm_quant_path, "/bio", "q3_", rcps[j], ".rds"))
+#   print(paste0("processing rcp", rcps[j]))
+#   for(k in 1:19){
+#     print(paste0("processing bioclim var: ", k))
+#     bio <- stack()
+#     for(i in 1:length(models)){
+#       print(paste0("processing model: ", i))
+#       dat <- readRDS(gcm_files[[i]])[[j]]
+#       bio <- stack(bio, dat[[k]])
+#     }
+#     
+#     print(paste0("getting quartiles..."))
+#     df1 <- na.omit(as.matrix(getValues(bio)))
+#     c <-rowQuantiles(df1, probs = c(0.25, 0.5, 0.75))
+#     for(m in 1:3){
+#       bioclim <- readRDS(file = paste0(gcm_quant_path, "/bio", quartiles[m], "_", rcps[j], ".rds"))
+#       r[inds] <- c[,m]
+#       names(r) <- paste0("bio", k)
+#       saveRDS(readAll(stack(bioclim, r)), file = paste0(gcm_quant_path, "/bio", quartiles[m], "_", rcps[j], ".rds"))
+#     }
+#   }
+# }
+# unlink(gcm_masked_path, recursive=T)
