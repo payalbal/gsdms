@@ -854,6 +854,9 @@ file.rename(infile, gsub("srtm", "elevation", infile))
 
 
 
+
+
+
 # ## --------------------------------------------------------- ##
 # ## Create covariate data.tables for model and prediction ####
 # ##  -- NOT NEEDED, PART OF PPM WORKFLOW -- ####
