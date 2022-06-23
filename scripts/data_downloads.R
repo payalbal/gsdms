@@ -249,7 +249,27 @@ file.remove("data/soil.zip")
 
 
 ## Landuse ----- ####
-## >> Source: Hurtt dataset - manual download ####
+## >> Source: Hurtt dataset ####
+## https://luh.umd.edu/data.shtml - get download links for 'states.nc' from webpage
+## >> >> Current: LUH2 v2h Release ####
+job::job({
+  target_folder <- file.path(data_dir, "landuse", "hurtt")
+  system(sprintf("wget -r -np -nH --reject 'index.html*' -e robots=off https://luh.umd.edu/LUH2/LUH2_v2h/states.nc -P %s", target_folder))
+})
+
+## >> >> Future: LUH2 v2f Release ####
+## >> >> NOTE: - Fix file path in data processing if downloaded this way ####
+## RCP2.6 SSP1 , RCP7.0 SSP3, RCP8.5 SSP5
+job::job({
+  target_folder <- file.path(data_dir, "landuse", "hurtt")
+  
+  system(sprintf("wget -r -np -nH --reject 'index.html*' -e robots=off https://luh.umd.edu/LUH2/LUH2_v2f/IMAGE/multiple-states_input4MIPs_landState_ScenarioMIP_UofMD-IMAGE-ssp126-2-1-f_gn_2015-2100.nc -P %s", target_folder))
+  
+  system(sprintf("wget -r -np -nH --reject 'index.html*' -e robots=off https://luh.umd.edu/LUH2/LUH2_v2f/AIM/multiple-states_input4MIPs_landState_ScenarioMIP_UofMD-AIM-ssp370-2-1-f_gn_2015-2100.nc -P %s", target_folder))
+  
+  system(sprintf("wget -r -np -nH --reject 'index.html*' -e robots=off https://luh.umd.edu/LUH2/LUH2_v2f/MAGPIE/multiple-states_input4MIPs_landState_ScenarioMIP_UofMD-MAGPIE-ssp585-2-1-f_gn_2015-2100.nc -P %s", target_folder))
+})
+
 
 
 ## >> Source: ESA - Climate Research Data Package (CRDP) ####

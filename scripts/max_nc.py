@@ -57,8 +57,8 @@ def max_nc(scenario, t, infile1, infile2, infile3, infile4, infile5, outdir):
 ## Specify parameters
 ssp = ['ssp1-rcp26', 'ssp3-rcp70', 'ssp5-rcp85']
 years = ['2015', '2020', '2025', '2030', '2035', '2040', '2045', '2050', '2055', '2060', '2065', '2070']
-inpath = '/tempdata/research-cifs/uom_data/gsdms_data/outputs/hurtt'
-outdir = '/tempdata/research-cifs/uom_data/gsdms_data/outputs/hurtt/'
+inpath = '/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/outputs/hurtt_future'
+outdir = '/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/outputs/hurtt_future/'
 
 ## Get input files
 infiles = [os.path.join(inpath, f) for f in os.listdir(inpath) if
@@ -95,8 +95,8 @@ for i in ssp:
 # ## >> Debugging
 # ssp = ['ssp5-rcp85']
 # years = ['2070']
-# inpath = '/tempdata/research-cifs/uom_data/gsdms_data/outputs/hurtt'
-# outdir = '/tempdata/research-cifs/uom_data/gsdms_data/outputs/hurtt/'
+# inpath = '/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/outputs/hurtt_future'
+# outdir = '/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/outputs/hurtt_future/'
 # 
 # infiles = [os.path.join(inpath, f) for f in os.listdir(inpath) if
 # os.path.isfile(os.path.join(inpath, f))]

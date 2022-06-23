@@ -1,4 +1,4 @@
-## Extract layers from Hurtt dataset: https://luh.umd.edu/
+## Extract layers from Hurtt dataset - future layers: LUH2 v2f Release (https://luh.umd.edu/)
 ## Layers extracted by SSP, land use class and years
 
 
@@ -11,9 +11,7 @@ from numpy import dstack
 
 ## Specify extraction parameters
 luvars = ['primf', 'primn', 'secdf', 'secdn', 'urban', 'c3ann', 'c4ann', 'c3per', 'c4per', 'c3nfx', 'pastr', 'range']
-time_steps = ['1', '6', '11', '16', '21', '26', '31', '36', '41', '46', '51', '56']
-# luvars = ['primf', 'urban']
-# time_steps = ['1']
+time_steps = ['0', '5', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'] ## python indices start from 0
 
 
 ## Specify extract function
@@ -39,21 +37,21 @@ def extract_nc(infile, outdir, lu_var, time_slice):
 
 
 ## Run extract function (loop through extraction parameters for each input file)
-outdir = '/tempdata/research-cifs/uom_data/gsdms_data/outputs/hurtt/'
+outdir = '/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/outputs/hurtt_future/'
 
-infile = '/tempdata/research-cifs/uom_data/gsdms_data/landuse/Hurtt/ssp1-rcp26_2015-2100.nc'
+infile = '/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/landuse/hurtt/ssp1-rcp26_2015-2100.nc'
 for i in luvars:
   for j in time_steps:
     extract_nc(infile = infile, outdir = outdir, lu_var = i, time_slice = j)
 
 
-infile = '/tempdata/research-cifs/uom_data/gsdms_data/landuse/Hurtt/ssp3-rcp70_2015-2100.nc'
+infile = '/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/landuse/hurtt/ssp3-rcp70_2015-2100.nc'
 for i in luvars:
   for j in time_steps:
     extract_nc(infile = infile, outdir = outdir, lu_var = i, time_slice = j)
 
 
-infile = '/tempdata/research-cifs/uom_data/gsdms_data/landuse/Hurtt/ssp5-rcp85_2015-2100.nc'
+infile = '/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/landuse/hurtt/ssp5-rcp85_2015-2100.nc'
 for i in luvars:
   for j in time_steps:
     extract_nc(infile = infile, outdir = outdir, lu_var = i, time_slice = j)
@@ -63,11 +61,15 @@ for i in luvars:
   
   
 
-# ## Example run - detailed
+# ## Debug run - select statements
 # import xarray as xr
 # 
+# ## Specify extraction parameters
+# luvars = ['primf', 'urban']
+# time_steps = ['1']
+# 
 # ## >> Load file
-# fp = '/tempdata/research-cifs/uom_data/gsdms_data/landuse/Hurtt/ssp5-rcp85_2015-2100.nc'
+# fp = '/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/landuse/hurtt/ssp5-rcp85_2015-2100.nc'
 # sspnc = xr.open_dataset(fp, decode_times=False)
 # print( sspnc )
 # 
@@ -85,5 +87,5 @@ for i in luvars:
 # extrsub = extr.sel( time = 1.0, method='nearest', tolerance = 0.5, drop=True )
 # print( extrsub )
 # 
-# extrsub.to_netcdf('/tempdata/research-cifs/uom_data/gsdms_data/outputs/hurtt/primf_t2015.nc')
+# extrsub.to_netcdf('/tempdata/research-cifs/uom_data/gsdms_data/outputs/hurtt_future/primf_t2015.nc')
 
