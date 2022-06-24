@@ -5,7 +5,6 @@ output/
 scripts/connect_to_server.R
 figs/
 data/
-scripts/0_gsdms.Rmd
 
 # R files #
 ###########
