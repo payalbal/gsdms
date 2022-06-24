@@ -1,3 +1,5 @@
+
+
 ## Covariate data processing for global analyses
 ## NOTE: Data sources recorded in data_downloads.R
 
@@ -460,7 +462,7 @@ bio_future <- list.files()
 
 ## CHELSA current
 chelsa_current <- list.files(file.path(data_dir, "CHELSA/envicloud/chelsa/chelsa_V2/GLOBAL/climatologies/1981-2010/bio"),
-                         full.names = TRUE, recursive = TRUE)
+                             full.names = TRUE, recursive = TRUE)
 
 kgvars <- grep("CHELSA_kg", chelsa_current, value = TRUE)
 chelsa_current <- grep("CHELSA_bio", chelsa_current, value = TRUE)
