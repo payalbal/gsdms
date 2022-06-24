@@ -1,15 +1,9 @@
 # Specific files/folders #
 ##########################
-scripts/trialscripts/
-scripts/archive/
-output/
-scripts/connect_to_server.R
-data/
-<<<<<<< HEAD
-=======
-temp/
 docs/
->>>>>>> f14e20dc928acef0b872d3078168a205c612d6de
+scripts/connect_to_server.R
+scripts/archive/
+scripts/job*
 
 # R files #
 ###########
