@@ -1,12 +1,9 @@
 # Specific files/folders #
 ##########################
-scripts/trialscripts/
-scripts/archive/
-output/
-scripts/connect_to_server.R
-data/
-temp/
 docs/
+scripts/archive/
+scripts/connect_to_server.R
+
 
 # R files #
 ###########
