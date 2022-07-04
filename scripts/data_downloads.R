@@ -278,7 +278,7 @@ job::job({
 ## > Download Data (login if required)
 ## Select options (here, 2018, v2.1.1, .tar.gz)
 ## Submit request > Right click Download button and Copy link location
-system("wget -np -nH --reject 'index.html*' -e robots=off https://download-0009.copernicus-climate.eu/cache-compute-0009/cache/data3/dataset-satellite-land-cover-3c12d11c-1b01-4054-95ee-339179fbfa76.tar.gz -O /home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/landuse/CCI/dataset-satellite-land-cover-3c12d11c-1b01-4054-95ee-339179fbfa76.tar.gz")
+system("wget -np -nH --reject 'index.html*' -e robots=off https://download-0009.copernicus-climate.eu/cache-compute-0009/cache/data3/dataset-satellite-land-cover-3c12d11c-1b01-4054-95ee-339179fbfa76.tar.gz -O /tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/landuse/CCI/dataset-satellite-land-cover-3c12d11c-1b01-4054-95ee-339179fbfa76.tar.gz")
 
 ludir <- file.path( data_dir, "landuse/CCI")
 landuse <- list.files(ludir, pattern = ".tar",
@@ -394,7 +394,7 @@ unzip("data/roads_oceaniaeast.zip", exdir = "/tempdata/workdir/data/roads_oceani
 
 ## Lakes & rivers ---- ####
 ## Source: https://www.worldwildlife.org/pages/global-lakes-and-wetlands-database (Level 3)
-target_folder <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/lakesrivers/GLWD/"
+target_folder <- "/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/lakesrivers/GLWD/"
 system(sprintf("wget -r -np -nH --reject 'index.html*' -e robots=off https://files.worldwildlife.org/wwfcmsprod/files/Publication/file/9slil0ww7t_GLWD_level3.zip -P %s", target_folder))
 unzip(file.path(target_folder, "wwfcmsprod/files/Publication/file/9slil0ww7t_GLWD_level3.zip"), exdir = target_folder)
 
@@ -424,7 +424,7 @@ unzip("data/builtup.zip", exdir = "/tempdata/workdir/data/builtup")
 
 ## Protected areas ---- #### 
 ## Source: https://www.protectedplanet.net/en/thematic-areas/wdpa?tab=WDPA
-target_folder <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/protectedareas"
+target_folder <- "/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/protectedareas"
 system(sprintf("wget -r -np -nH --reject 'index.html*' -e robots=off https://d1gam3xoknrgr2.cloudfront.net/current/WDPA_Feb2022_Public_shp.zip -P %s", target_folder))
 unzip(file.path(target_folder, "wwfcmsprod/files/Publication/file/9slil0ww7t_GLWD_level3.zip"), exdir = target_folder)
 unzip(file.path(target_folder, "current/WDPA_Feb2022_Public_shp.zip"), exdir = target_folder)
@@ -448,7 +448,7 @@ rstudioapi::jobRunScript(job_script, encoding = "unknown",
                          workingDir = "/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/",
                          importEnv = FALSE, exportEnv = "")
 
-data_dir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data"
+data_dir <- "/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data"
 if(file.exists(file.path(data_dir, "protectedareas/wdpa.tif"))){
   file.remove(file.path(data_dir, "protectedareas/wdpa_temp.vrt"))
 }
@@ -456,20 +456,24 @@ if(file.exists(file.path(data_dir, "protectedareas/wdpa.tif"))){
 
 ## Population ---- ####
 ## Source (requires login): https://sedac.ciesin.columbia.edu/data/set/gpw-v4-population-density-rev11
-## Select year (2000), fileformat (GeoTiff), resolution (30 sec) 
+## Select year (2020), fileformat (GeoTiff), resolution (30 sec) 
 ## Click 'Create Download' and copy download links
-## Unable to find direct download link
-target_folder <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/population/SEDAC"
-system(sprintf("wget -r -np -nH --reject 'index.html*' -e robots=off https://sedac.ciesin.columbia.edu/downloads/data/gpw-v4/gpw-v4-population-density-rev11/gpw-v4-population-density-rev11_2000_30_sec_tif.zip -P %s", target_folder))
+## NOT WORKING
+target_folder <- "/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/population/SEDAC"
+
+system(sprintf("wget --no-host-directories -np --reject 'index.html*' -e robots=off https://sedac.ciesin.columbia.edu/downloads/data/gpw-v4/gpw-v4-population-density-rev11/gpw-v4-population-density-rev11_2020_30_sec_tif.zip -P %s", target_folder))
 
 unzip("data/population.zip", exdir = "/tempdata/workdir/data/population")
+
+# ## 2000
+# system(sprintf("wget -r -np -nH --reject 'index.html*' -e robots=off https://sedac.ciesin.columbia.edu/downloads/data/gpw-v4/gpw-v4-population-density-rev11/gpw-v4-population-density-rev11_2000_30_sec_tif.zip -P %s", target_folder))
 
 
 ## Tree cover ---- ####
 ## Source: Hansen https://storage.googleapis.com/earthenginepartners-hansen/GFC-2020-v1.8/download.html
 ## Download urls for 'treecover2000'
-input_files <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/Hansen_treecover/treecover2000_urls.txt"
-target_folder <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data/Hansen_treecover/"
+input_files <- "/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/Hansen_treecover/treecover2000_urls.txt"
+target_folder <- "/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data/Hansen_treecover/"
 system(sprintf("wget --no-host-directories --force-directories --input-file=%s -P %s", input_files, target_folder))
 
 ## >> Stitch tiles
@@ -478,7 +482,7 @@ rstudioapi::jobRunScript(job_script, encoding = "unknown",
                          workingDir = "/home/payalb/gsdms_r_vol/tempdata/workdir/gsdms/",
                          importEnv = FALSE, exportEnv = "")
 
-data_dir <- "/home/payalb/gsdms_r_vol/tempdata/research-cifs/uom_data/gsdms_data"
+data_dir <- "/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data"
 if(file.exists(file.path(data_dir, "Hansen_treecover/hansen_tree.tif"))){
   file.remove(file.path(data_dir, "Hansen_treecover/hansen_treetemp.vrt"))
 }
