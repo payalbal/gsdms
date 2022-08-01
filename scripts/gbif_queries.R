@@ -1,6 +1,6 @@
 ## gbif_queries
 ## Function to extract and prepare species data from GBIF db for ppm fitting
-
+## $$ New package: Australian Mammals Species List as an excel sheet? ####
 
 ## Set working environment ####
 rm(list = ls())
