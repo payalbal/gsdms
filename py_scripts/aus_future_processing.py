@@ -48,7 +48,7 @@ def translate_step1(crs, infile_path, outfolder):
 
     return outfile_path
 
-
+#TODO refactor get_esxtent to receive a path instead of an open dataset
 def get_extent(ds):
 
     """ Return list of corner coordinates from a gdal Dataset
@@ -121,7 +121,7 @@ def clip_layer_st_step4(path_mask250, infile_path, outfolder):
 
     aus_mask=gdal.Open(path_mask250)
 
-    mask_extent = get_extent(aus_mask)
+    mask_extent = get_extent(aus_mask) 
 
     os.system(f"gdalwarp -overwrite -ot Float32 -te {mask_extent[0][0]} {mask_extent[0][1]} \
                                                     {mask_extent[1][0]} {mask_extent[1][1]} \

@@ -34,8 +34,7 @@ new_extent = "-180 -60 180 90"
 res_1k=1000
 res_10k=res_1k*10
 
-path_mask1="/home/ubuntu/mnt/Alex/aus-ppms_alex/data/ausmask_noaa_1kmWGS_NA.tif"
-path_mask250="/home/ubuntu/mnt2/outputs/mask/ausmask_nesp_250mAlbersEA.tif"
+
 new_crs = "EPSG:4326" 
 
 gsdms_dir = "/home/ubuntu/mnt3" # "/tempdata/research-cifs/6300-payalb/uom_data/gsdms_data" in Payal's drive
@@ -43,7 +42,7 @@ aus_dir = "/home/ubuntu/mnt2" # "/tempdata/research-cifs/6300-payalb/uom_data/au
 data_dir = "/home/ubuntu/mnt/aus-ppms_alex/data"
 temp_dir="/home/ubuntu/mnt/Alex/aus-ppms_alex/temp" #Where I'll store temporal files produced by intermediate steps
 
-
+# TODO refactor this change_nodata_value to take any data value in the arguments
 def change_nodata_value(infile_path, outfolder):
     filename=ntpath.basename(infile_path)
     out_filename=filename.replace(".tif","nodata.tif") #TODO Handle this assumption later
@@ -135,6 +134,23 @@ def set_extent(extent,infile_path, outfolder, out_name=None):
                                                 {infile_path} {outfile_path}")
     return outfile_path
 
+def get_extent(infile_path):
+
+    """ Return list of corner coordinates from a gdal Dataset
+        Taken from: https://gis.stackexchange.com/questions/57834/how-to-get-raster-corner-coordinates-using-python-gdal-bindings
+    """
+    ds=gdal.Open(infile_path)
+
+    xmin, xpixel, _, ymax, _, ypixel = ds.GetGeoTransform()
+    width, height = ds.RasterXSize, ds.RasterYSize
+    xmax = xmin + width * xpixel
+    ymin = ymax + height * ypixel
+
+    all_corners=[(xmin, ymax), (xmax, ymax), (xmax, ymin), (xmin, ymin)] #maybe useful later
+    min_coord, max_coord =(xmin, ymin), (xmax, ymax)   
+    
+    return [min_coord , max_coord]
+
 def reproject(crs, resolutionX, resolutionY, infile_path, outfolder, out_name=None):
     #Get the infile name from the path
     filename=ntpath.basename(infile_path)
@@ -157,10 +173,30 @@ def reproject_with_resampling(resamp_method, resolutionX,resolutionY, s_crs, t_c
     else:
         out_filename=out_name
 
+    
     outfile_path=os.path.join(outfolder,out_filename)
 
     os.system(f"gdalwarp -overwrite -ot Float32 -r {resamp_method} -tr {resolutionX} {resolutionY}\
-                                                 -s_srs '{s_crs}' -t_srs '{t_crs}' {infile_path} {outfolder}")
+                                                 -s_srs '{s_crs}' -t_srs '{t_crs}' {infile_path} {outfile_path}")
+    return outfile_path
+
+def apply_mask(infile_path, mask_path, no_data_val, outfolder, out_name=None):
+    #Get the infile name from the path
+    filename=ntpath.basename(infile_path)
+    if out_name is None:
+        out_filename=filename.replace(".tif",f"_masked.tif")
+    else:
+        out_filename=out_name
+
+    outfile_path=os.path.join(outfolder,out_filename)
+
+    #Processing nodataval
+    nodatavalue=str(no_data_val)
+    
+    print(f"no data value is : {nodatavalue}")
+    
+    os.system(f"gdal_calc.py -A {infile_path} -B {mask_path} --calc='((B==1)*A)+(-9999*(B!=1))' --NoDataValue={nodatavalue} --outfile={outfile_path}")
+
     return outfile_path
 
 
@@ -202,20 +238,46 @@ if __name__=="__main__":
     '''
 
 
-
+    
     #######Layers processing
-    temp_in="/home/ubuntu/mnt/Alex/gsdms_alex/temp/mask/globalmask_wgs_30s_clip.tif"
-    temp_out="/home/ubuntu/mnt/Alex/gsdms_alex/temp/mask"
+    temp_in="/home/ubuntu/mnt3/soil/71a04c738fde75ee64f57118ed466530/IGBPDIS_SURFPRODS/data/bulkdens_wgs.tif"
+    temp_dir="/home/ubuntu/mnt/Alex/gsdms_alex/temp/proclay/"
+    temp_out="/home/ubuntu/mnt/Alex/gsdms_alex/temp/proclay/"
 
     ## >> Step two_Reduce layer extent, as specified in WGS 84 ####
+    print("\n Setting extent \n")
     temp_out=set_extent(new_extent,temp_in,temp_out)
+
+    temp_in=temp_out
     
     ## >> Step three_Reproject layer to Equal earth ####
-    temp_out=reproject_with_resampling("bilinear", res_10k,res_10k, wgs_crs, equalearth_crs, temp_in, temp_out, out_name=None)
+    print("\n Reprojecting to equal earth \n")
+    temp_out=reproject_with_resampling("bilinear", res_10k,res_10k, wgs_crs, equalearth_crs, temp_in, temp_dir, out_name=None)
+    
+    ## >> Step four_Clip layer s.t. #cells in layer equal #cells in mask ####
+    print("\n Clipping to mask \n")
+    mask_path="/home/ubuntu/mnt/Alex/gsdms_alex/temp/mask/globalmask_ee_10km_nodata.tif"
+    temp_in=temp_out
+    extent_mask = get_extent(mask_path)
+    temp_out=set_extent(extent_mask,temp_in,temp_dir,"bulkdens_wgs_clip_reproj_clip2.tif") #TODO change this hardcoded name
+
+    print("\n Changing NoDataValue \n")
+    ## >> Step five_Change nodata values to -9999 ####
+    ## To remove nodata value of -3.4e+38
+    ## This is not needed for bio_future layers (check)
+    temp_in=temp_out
+    temp_out=change_nodata_value(temp_in, temp_dir)
+
+    print("\n Applying mask \n")
+    ## >> Step six_Mask ####
+    ## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R    
+    temp_in=temp_out
+    temp_out=apply_mask(temp_in,mask_path,-9999,temp_dir)
+
 
     
 
-
+    print(get_stats_raster(temp_out))
 
 
 
