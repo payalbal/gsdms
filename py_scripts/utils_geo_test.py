@@ -100,6 +100,29 @@ def get_stats_raster(infile_path, silent=True):
 
     return raster_stats
 
+def get_stats_directory(input_dir, output_dir=None):
+    #Creating summary of stats for all the tif files in the output directory
+    
+    infiles=[]
+    for file in os.listdir(input_dir):
+        # check only text files
+        if file.endswith('.tif'):
+            infiles.append(file)
+    
+    if not output_dir:
+        output_dir=input_dir
+
+    stats_out_path=os.path.join(output_dir,'report.txt')
+    with open(stats_out_path,'w') as f:
+        for filename in infiles:
+            file_to_stats=os.path.join(output_dir,filename)
+            f.write(f'\nStats for {filename} :\n')
+            stats=get_stats_raster(file_to_stats)
+            for key, value in stats.items():
+                f.write(f'{key} : ')
+                f.write(f'{value}')
+                f.write('\n')
+
 def translate(crs, infile_path, outfolder, out_name=None):
     
     #Get the infile name from the path
@@ -193,20 +216,80 @@ def apply_mask(infile_path, mask_path, no_data_val, outfolder, out_name=None):
     #Processing nodataval
     nodatavalue=str(no_data_val)
     
-    print(f"no data value is : {nodatavalue}")
+    print(f"no data value is being set to : {nodatavalue}")
     
     os.system(f"gdal_calc.py -A {infile_path} -B {mask_path} --calc='((B==1)*A)+(-9999*(B!=1))' --NoDataValue={nodatavalue} --outfile={outfile_path}")
 
     return outfile_path
 
+def run_pipeline(infile_path,new_crs,new_extent, resolution, s_crs, t_crs, temp_dir, output_dir):
+
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+    
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    ## >> Step two_Reduce layer extent, as specified in WGS 84 ####
+    temp_in=infile_path
+    print("\n Setting extent \n")
+    temp_out=set_extent(new_extent,temp_in,temp_dir)# TODO change this to temp_out after coding step 1
+
+    ## >> Step three_Reproject layer to Equal earth ####
+    temp_in=temp_out
+    print("\n Reprojecting to equal earth \n")
+    temp_out=reproject_with_resampling("bilinear", resolution, resolution, s_crs, t_crs, temp_in, temp_dir, out_name=None)
+
+    ## >> Step four_Clip layer s.t. #cells in layer equal #cells in mask ####
+    print("\n Clipping to mask \n")
+    mask_path="/home/ubuntu/mnt/Alex/gsdms_alex/temp/mask/globalmask_ee_10km_nodata.tif" # TODO make func create_mask and call it if mask=None in arguments
+    temp_in=temp_out
+    extent_mask = get_extent(mask_path)
+    temp_out=set_extent(extent_mask,temp_in,temp_dir,"bulkdens_wgs_clip_reproj_clip2.tif") #TODO change this hardcoded name
+
+    
+    ## >> Step five_Change nodata values to -9999 ####
+    ## To remove nodata value of -3.4e+38
+    ## This is not needed for bio_future layers (check)
+    temp_in=temp_out
+    print("\n Changing NoDataValue \n")
+    temp_out=change_nodata_value(temp_in, temp_dir)
+
+    print("\n Applying mask \n")
+    ## >> Step six_Mask ####
+    ## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R    
+    temp_in=temp_out
+    final_out=apply_mask(temp_in,mask_path,-9999,output_dir)
+    
+    print(get_stats_raster(final_out))
+
+
+def run_pipeline_directory(input_dir, output_dir):
+    rasters = []
+
+    # Iterate directory 
+    for file in os.listdir(input_dir):
+        # check only .tif files
+        if file.endswith('.tif'):
+            rasters.append(file)
+    
+    for raster in rasters:
+        temp_in=os.path.join(input_dir,raster)
+        run_pipeline(temp_in,new_crs,wgs_crs,path_mask1,path_mask250, temp_dir, output_dir)
+
+    #Now I need the stats of the files I just processed.
+    #Therefore, the output_dir becomes the new input_dir for the stats function
+    input_dir=output_dir 
+
+    get_stats_directory(input_dir)
 
 if __name__=="__main__":
 
     #temp_in = input_file_path
-    temp_in = "/home/ubuntu/mnt/Alex/gsdms_alex/temp/bio_current_1nodatamask_ones.tif"
-    out_folder="/home/ubuntu/mnt/Alex/gsdms_alex/temp/mask"
-    if not os.path.exists(out_folder):
-        os.makedirs(out_folder)
+    #temp_in = "/home/ubuntu/mnt/Alex/gsdms_alex/temp/bio_current_1nodatamask_ones.tif"
+    #out_folder="/home/ubuntu/mnt/Alex/gsdms_alex/temp/mask"
+    #if not os.path.exists(out_folder):
+    #    os.makedirs(out_folder)
 
     #Mask creation
     '''temp_dir=output_dir
@@ -240,6 +323,14 @@ if __name__=="__main__":
 
     
     #######Layers processing
+    infile_path="/home/ubuntu/mnt3/soil/71a04c738fde75ee64f57118ed466530/IGBPDIS_SURFPRODS/data/bulkdens_wgs.tif"
+    temp_dir="/home/ubuntu/mnt/Alex/gsdms_alex/temp/proclay/"
+    output_dir="/home/ubuntu/mnt/Alex/gsdms_alex/temp/proclay/"
+
+    run_pipeline(infile_path, new_crs, new_extent, res_10k, wgs_crs, equalearth_crs, temp_dir, output_dir)
+    
+    '''
+    
     temp_in="/home/ubuntu/mnt3/soil/71a04c738fde75ee64f57118ed466530/IGBPDIS_SURFPRODS/data/bulkdens_wgs.tif"
     temp_dir="/home/ubuntu/mnt/Alex/gsdms_alex/temp/proclay/"
     temp_out="/home/ubuntu/mnt/Alex/gsdms_alex/temp/proclay/"
@@ -248,9 +339,10 @@ if __name__=="__main__":
     print("\n Setting extent \n")
     temp_out=set_extent(new_extent,temp_in,temp_out)
 
-    temp_in=temp_out
+    
     
     ## >> Step three_Reproject layer to Equal earth ####
+    temp_in=temp_out
     print("\n Reprojecting to equal earth \n")
     temp_out=reproject_with_resampling("bilinear", res_10k,res_10k, wgs_crs, equalearth_crs, temp_in, temp_dir, out_name=None)
     
@@ -273,11 +365,20 @@ if __name__=="__main__":
     ## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R    
     temp_in=temp_out
     temp_out=apply_mask(temp_in,mask_path,-9999,temp_dir)
+    print(get_stats_raster(temp_out))
+    
+    '''
 
+    
+    #print(get_stats_raster("/home/ubuntu/mnt/Alex/gsdms_alex/temp/proclay/bulkdens_wgs_clip_reproj_clip2nodata_masked.tif"))
+    
+    #print(get_stats_raster("/home/ubuntu/mnt3/outputs/byte_layers/layers_10k_byte/bulkdens_wgs_ee.tif"))
+
+    #print(get_stats_raster("/home/ubuntu/mnt3/outputs/layers_10k/soil/bulkdens_wgs_ee.tif"))
 
     
 
-    print(get_stats_raster(temp_out))
+    
 
 
 
