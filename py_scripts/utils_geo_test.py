@@ -222,16 +222,32 @@ def apply_mask(infile_path, mask_path, no_data_val, outfolder, out_name=None):
 
     return outfile_path
 
-def run_pipeline(infile_path,new_crs,new_extent, resolution, s_crs, t_crs, temp_dir, output_dir):
 
-    if not os.path.exists(temp_dir):
-        os.makedirs(temp_dir)
+def run_pipeline(infile_path,new_crs,new_extent, resolution, s_crs, t_crs, output_dir,temp_dir=None):
     
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    ## >> Step two_Reduce layer extent, as specified in WGS 84 ####
+    if temp_dir is None:
+        temp_dir=os.path.join(output_dir,"temp")
+
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+
+    # >> Step 1: Check CRS. Set it to EPSG:4326 if it is different
     temp_in=infile_path
+
+    with rasterio.open(temp_in) as src:
+        ori_crs=str(src.crs)
+        print (f"\nOriginal CRS is:{str(src.crs)}\n")
+        if ori_crs != new_crs:
+            print(f"Needs to be translated to {}")
+            temp_out = translate(new_crs, temp_in, temp_dir)
+
+
+
+    ## >> Step two_Reduce layer extent, as specified in WGS 84 ####
+    temp_in=temp_out
     print("\n Setting extent \n")
     temp_out=set_extent(new_extent,temp_in,temp_dir)# TODO change this to temp_out after coding step 1
 
@@ -283,28 +299,25 @@ def run_pipeline_directory(input_dir, output_dir):
 
     get_stats_directory(input_dir)
 
-if __name__=="__main__":
-
-    #temp_in = input_file_path
-    #temp_in = "/home/ubuntu/mnt/Alex/gsdms_alex/temp/bio_current_1nodatamask_ones.tif"
-    #out_folder="/home/ubuntu/mnt/Alex/gsdms_alex/temp/mask"
-    #if not os.path.exists(out_folder):
-    #    os.makedirs(out_folder)
-
-    #Mask creation
-    '''temp_dir=output_dir
-    temp_out = change_nodata_value(temp_in,temp_dir)
+def create_mask(infile_path,output_dir,crs,extent):
     
+    temp_dir=os.path.join(output_dir,"temp")
+
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+    
+    temp_in=infile_path
+    temp_out= change_nodata_value(temp_in,temp_dir)
+
     temp_in = temp_out
     temp_out=mask_ones(temp_in,temp_dir)
-    
+
     temp_in=temp_out
 
     # Setting crs for the mask
-    temp_out=translate(wgs_crs, temp_in, out_folder, "globalmask_wgs_30s.tif" )
+    print(f"\ntranslating {temp_in}\n")
+    temp_out=translate(crs, temp_in, temp_dir, "globalmask_wgs_30s.tif" )
 
-    # Checking that we set the crs correctly to the mask
-    crs_mask="" #/home/ubuntu/mnt/Alex/aus-ppms_alex/temp/   
     with rasterio.open(temp_out) as src:
         print ("CRS according to rasterio is:",type(src.crs),str(src.crs))
 
@@ -312,63 +325,43 @@ if __name__=="__main__":
     #print(get_stats_raster(temp_in))
 
     # Setting extent to the mask
-    temp_out= set_extent(new_extent,temp_in,temp_out, "globalmask_wgs_30s_clip.tif" )
+    temp_in=temp_out
+    print(f"\nSetting extent {temp_in}\n")
+    temp_out= set_extent(new_extent,temp_in,temp_dir, "globalmask_wgs_30s_clip.tif" )
 
     #Reproject the mask to resolution of 10km
-    temp_out=reproject(equalearth_crs, res_10k, res_10k,temp_in, temp_out, f"globalmask_ee_{res_10k/1000}km_nodata.tif")
+    temp_in=temp_out
+    print(f"\nReprojecting {temp_in}\n")
+    temp_out=reproject(equalearth_crs, res_10k, res_10k,temp_in, output_dir, f"globalmask_ee_{res_10k/1000}km_nodata.tif")
 
     #Note: For step 4: NoData value in mask was decided earlier to be -9999
-    '''
 
+    return temp_out
+    temp_in=infile_path
+
+
+if __name__=="__main__":
+
+    
+    infile_path = "/home/ubuntu/mnt/Alex/gsdms_alex/temp/bio_current_1.tif"
+    out_folder="/home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/mask"
+    if not os.path.exists(out_folder):
+        os.makedirs(out_folder)
+
+    #Mask creation
+    #mask_path=create_mask(infile_path,out_folder, new_crs,new_extent)
+    #print(get_stats_raster(mask_path))
+
+    #print(get_stats_raster("/home/ubuntu/mnt/Alex/gsdms_alex/temp/mask/globalmask_ee_10km_nodata.tif"))
 
     
     #######Layers processing
     infile_path="/home/ubuntu/mnt3/soil/71a04c738fde75ee64f57118ed466530/IGBPDIS_SURFPRODS/data/bulkdens_wgs.tif"
-    temp_dir="/home/ubuntu/mnt/Alex/gsdms_alex/temp/proclay/"
-    output_dir="/home/ubuntu/mnt/Alex/gsdms_alex/temp/proclay/"
+    output_dir="/home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/10km/"
 
-    run_pipeline(infile_path, new_crs, new_extent, res_10k, wgs_crs, equalearth_crs, temp_dir, output_dir)
+    run_pipeline(infile_path, new_crs, new_extent, res_10k, wgs_crs, equalearth_crs, output_dir, temp_dir=None)
     
-    '''
-    
-    temp_in="/home/ubuntu/mnt3/soil/71a04c738fde75ee64f57118ed466530/IGBPDIS_SURFPRODS/data/bulkdens_wgs.tif"
-    temp_dir="/home/ubuntu/mnt/Alex/gsdms_alex/temp/proclay/"
-    temp_out="/home/ubuntu/mnt/Alex/gsdms_alex/temp/proclay/"
-
-    ## >> Step two_Reduce layer extent, as specified in WGS 84 ####
-    print("\n Setting extent \n")
-    temp_out=set_extent(new_extent,temp_in,temp_out)
-
-    
-    
-    ## >> Step three_Reproject layer to Equal earth ####
-    temp_in=temp_out
-    print("\n Reprojecting to equal earth \n")
-    temp_out=reproject_with_resampling("bilinear", res_10k,res_10k, wgs_crs, equalearth_crs, temp_in, temp_dir, out_name=None)
-    
-    ## >> Step four_Clip layer s.t. #cells in layer equal #cells in mask ####
-    print("\n Clipping to mask \n")
-    mask_path="/home/ubuntu/mnt/Alex/gsdms_alex/temp/mask/globalmask_ee_10km_nodata.tif"
-    temp_in=temp_out
-    extent_mask = get_extent(mask_path)
-    temp_out=set_extent(extent_mask,temp_in,temp_dir,"bulkdens_wgs_clip_reproj_clip2.tif") #TODO change this hardcoded name
-
-    print("\n Changing NoDataValue \n")
-    ## >> Step five_Change nodata values to -9999 ####
-    ## To remove nodata value of -3.4e+38
-    ## This is not needed for bio_future layers (check)
-    temp_in=temp_out
-    temp_out=change_nodata_value(temp_in, temp_dir)
-
-    print("\n Applying mask \n")
-    ## >> Step six_Mask ####
-    ## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R    
-    temp_in=temp_out
-    temp_out=apply_mask(temp_in,mask_path,-9999,temp_dir)
-    print(get_stats_raster(temp_out))
-    
-    '''
-
+    print(get_stats_raster("/home/ubuntu/mnt3/outputs/layers_10k/soil/bulkdens_wgs_ee.tif"))
     
     #print(get_stats_raster("/home/ubuntu/mnt/Alex/gsdms_alex/temp/proclay/bulkdens_wgs_clip_reproj_clip2nodata_masked.tif"))
     
