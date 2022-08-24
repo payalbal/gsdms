@@ -14,16 +14,21 @@ import subprocess
 
 from rasterstats import zonal_stats
 
-'''import argparse
+import argparse
 parser= argparse.ArgumentParser(description='Program to generate australian future bioclim from global future bioclim')
 parser.add_argument('-i','--input_file_path', type=str, metavar='', help='specify the folder where the tif files to be averaged are')
+parser.add_argument('-m','--mask_path', type=str, metavar='', help='specify the folder where the tif files to be averaged are')
 parser.add_argument('-o','--output_directory', type=str, metavar='', help='specify the folder where the resulting file will be stored')
-args = parser.parse_args()
-'''
+parser.add_argument('-r','--resolution', type=int, metavar='', help='desired resolution in meters')
 
-# Defining input and output directories
-#input_file_path=args.input_file_path #"/home/ubuntu/mnt/Alex/gsdms_alex/outputs/out_ssp126_2021-2040"
-#output_dir= args.output_directory #"/home/ubuntu/mnt/Alex/aus-ppms_alex/outputs"
+args = parser.parse_args()
+
+
+# Defining input, mask and output directories
+input_file_path=args.input_file_path #"/home/ubuntu/mnt/Alex/gsdms_alex/outputs/out_ssp126_2021-2040"
+mask_path=args.mask_path
+output_dir= args.output_directory #"/home/ubuntu/mnt/Alex/aus-ppms_alex/outputs"
+
 
 ## String for the wgs projection
 equalearth_crs = '+proj=eqearth +ellips=WGS84 +wktext'
@@ -31,9 +36,8 @@ wgs_crs = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 
 new_extent = "-180 -60 180 90"
 
-res_1k=1000
-res_10k=res_1k*10
 
+res=args.resolution
 
 new_crs = "EPSG:4326" 
 
@@ -42,10 +46,44 @@ aus_dir = "/home/ubuntu/mnt2" # "/tempdata/research-cifs/6300-payalb/uom_data/au
 data_dir = "/home/ubuntu/mnt/aus-ppms_alex/data"
 temp_dir="/home/ubuntu/mnt/Alex/aus-ppms_alex/temp" #Where I'll store temporal files produced by intermediate steps
 
+
+#
+def get_output_name(output_path):
+    
+    print(f'out is file? {output_path}')
+    if str(output_path).endswith('/') or str(output_path).endswith('"\"'):
+        print("is NOT file")
+        output_folder=os.path.dirname(output_path)
+        output_name=None
+    else:
+        print("is file")
+        output_folder=os.path.dirname(output_path)
+        output_name=ntpath.basename(output_path)
+    print(output_folder)
+    print(output_name)
+    return output_folder , output_name
+
+def add_suffix_step(infile_path, suffix):
+    '''Adds the suffix specified depending on the extension of the input
+    '''
+    filename=ntpath.basename(infile_path)
+    str_infile_path=str(infile_path)
+    str_infile_path=str_infile_path.lower()
+    if str_infile_path.endswith('.adf'):
+        filename=filename.replace('.adf',suffix)
+    elif str_infile_path.endswith('.dat'):
+        filename=filename.replace('.dat',suffix)
+    elif str_infile_path.endswith('.tif'):
+        filename=filename.replace('.tif',suffix)
+
+    return filename
+
 # TODO refactor this change_nodata_value to take any data value in the arguments
 def change_nodata_value(infile_path, outfolder):
-    filename=ntpath.basename(infile_path)
-    out_filename=filename.replace(".tif","nodata.tif") #TODO Handle this assumption later
+    #filename=ntpath.basename(infile_path)
+    #out_filename=filename.replace(".tif","nodata.tif") #TODO Handle this assumption later
+
+    out_filename=add_suffix_step(infile_path,"nodata.tif")
     outfile_path=os.path.join(outfolder,out_filename)
 
     os.system(f"gdalwarp -dstnodata -9999 {infile_path} {outfile_path} ")
@@ -54,8 +92,10 @@ def change_nodata_value(infile_path, outfolder):
 
 def mask_ones(infile_path,outfolder):
 
-    filename=ntpath.basename(infile_path)
-    out_filename=filename.replace(".tif","mask_ones.tif") #TODO Handle this assumption later
+    #filename=ntpath.basename(infile_path)
+    #out_filename=filename.replace(".tif","mask_ones.tif") #TODO Handle this assumption later
+    out_filename=filename.add_suffix_step(infile_path,"mask_ones.tif")
+    
     outfile_path=os.path.join(outfolder,out_filename)
     print(f"inside mask_ones")
     call=f'gdal_calc.py -A {infile_path} --outfile {outfile_path} --calc="numpy.where(A!=-9999,1,-9999)" --NoDataValue=-9999'  
@@ -67,7 +107,9 @@ def mask_ones(infile_path,outfolder):
 def get_shapefile(infile_path):
     
     outfile_path = str(infile_path).replace(".tif",".shp")
+    
     out_filename = ntpath.basename(outfile_path)
+
     
     call = f"gdaltindex {outfile_path} {infile_path}"
 
@@ -126,9 +168,10 @@ def get_stats_directory(input_dir, output_dir=None):
 def translate(crs, infile_path, outfolder, out_name=None):
     
     #Get the infile name from the path
-    filename=ntpath.basename(infile_path)
+    #filename=ntpath.basename(infile_path)
     if out_name is None:
-        out_filename=filename.replace(".tif","_wgs.tif")
+        #out_filename=filename.replace(".tif","_wgs.tif")
+        out_filename=add_suffix_step(infile_path,"_wgs.tif")
     else:
         out_filename=out_name
 
@@ -141,15 +184,16 @@ def translate(crs, infile_path, outfolder, out_name=None):
 
 def set_extent(extent,infile_path, outfolder, out_name=None):
     #Get the infile name from the path
-    filename=ntpath.basename(infile_path)
+    #filename=ntpath.basename(infile_path)
     if out_name is None:
-        out_filename=filename.replace(".tif",f"_clip.tif")
+        out_filename=add_suffix_step(infile_path,"_clip.tif")
     else:
         out_filename=out_name
 
     outfile_path=os.path.join(outfolder,out_filename)
-
+    
     if isinstance(extent, str):
+        print(f"gdalwarp -overwrite -ot Float32 -te {extent} {infile_path} {outfile_path}")
         os.system(f"gdalwarp -overwrite -ot Float32 -te {extent} {infile_path} {outfile_path}")
     elif isinstance(extent,list):
         os.system(f"gdalwarp -overwrite -ot Float32 -te {extent[0][0]} {extent[0][1]} \
@@ -176,9 +220,9 @@ def get_extent(infile_path):
 
 def reproject(crs, resolutionX, resolutionY, infile_path, outfolder, out_name=None):
     #Get the infile name from the path
-    filename=ntpath.basename(infile_path)
+    #filename=ntpath.basename(infile_path)
     if out_name is None:
-        out_filename=filename.replace(".tif",f"_reproj.tif")
+        out_filename=add_suffix_step(infile_path,"_reproj.tif")
     else:
         out_filename=out_name
 
@@ -190,9 +234,9 @@ def reproject(crs, resolutionX, resolutionY, infile_path, outfolder, out_name=No
 
 def reproject_with_resampling(resamp_method, resolutionX,resolutionY, s_crs, t_crs, infile_path, outfolder, out_name=None):
     #Get the infile name from the path
-    filename=ntpath.basename(infile_path)
+    #filename=ntpath.basename(infile_path)
     if out_name is None:
-        out_filename=filename.replace(".tif",f"_reproj.tif")
+        out_filename=add_suffix_step(infile_path,"_reproj.tif")
     else:
         out_filename=out_name
 
@@ -205,9 +249,9 @@ def reproject_with_resampling(resamp_method, resolutionX,resolutionY, s_crs, t_c
 
 def apply_mask(infile_path, mask_path, no_data_val, outfolder, out_name=None):
     #Get the infile name from the path
-    filename=ntpath.basename(infile_path)
+    #filename=ntpath.basename(infile_path)
     if out_name is None:
-        out_filename=filename.replace(".tif",f"_masked.tif")
+        out_filename=add_suffix_step(infile_path,"_masked.tif")
     else:
         out_filename=out_name
 
@@ -223,9 +267,16 @@ def apply_mask(infile_path, mask_path, no_data_val, outfolder, out_name=None):
     return outfile_path
 
 
-def run_pipeline(infile_path,new_crs,new_extent, resolution, s_crs, t_crs, output_dir,temp_dir=None):
+def run_pipeline(infile_path,mask_path,new_crs,new_extent, resolution, s_crs, t_crs, output_path,temp_dir=None):
+    '''
+
+    output_path: Path to output. Can be just a directory or a file 
+    '''
+
+    output_dir , output_name = get_output_name(output_path)
     
     if not os.path.exists(output_dir):
+        print(f'creating output folder: {output_dir}')
         os.makedirs(output_dir)
 
     if temp_dir is None:
@@ -241,15 +292,17 @@ def run_pipeline(infile_path,new_crs,new_extent, resolution, s_crs, t_crs, outpu
         ori_crs=str(src.crs)
         print (f"\nOriginal CRS is:{str(src.crs)}\n")
         if ori_crs != new_crs:
-            print(f"Needs to be translated to {}")
+            print(f"Needs to be translated to {new_crs}")
             temp_out = translate(new_crs, temp_in, temp_dir)
+            temp_in=temp_out
 
 
 
     ## >> Step two_Reduce layer extent, as specified in WGS 84 ####
-    temp_in=temp_out
+    
     print("\n Setting extent \n")
     temp_out=set_extent(new_extent,temp_in,temp_dir)# TODO change this to temp_out after coding step 1
+
 
     ## >> Step three_Reproject layer to Equal earth ####
     temp_in=temp_out
@@ -258,10 +311,9 @@ def run_pipeline(infile_path,new_crs,new_extent, resolution, s_crs, t_crs, outpu
 
     ## >> Step four_Clip layer s.t. #cells in layer equal #cells in mask ####
     print("\n Clipping to mask \n")
-    mask_path="/home/ubuntu/mnt/Alex/gsdms_alex/temp/mask/globalmask_ee_10km_nodata.tif" # TODO make func create_mask and call it if mask=None in arguments
     temp_in=temp_out
     extent_mask = get_extent(mask_path)
-    temp_out=set_extent(extent_mask,temp_in,temp_dir,"bulkdens_wgs_clip_reproj_clip2.tif") #TODO change this hardcoded name
+    temp_out=set_extent(extent_mask,temp_in,temp_dir)
 
     
     ## >> Step five_Change nodata values to -9999 ####
@@ -275,12 +327,12 @@ def run_pipeline(infile_path,new_crs,new_extent, resolution, s_crs, t_crs, outpu
     ## >> Step six_Mask ####
     ## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R    
     temp_in=temp_out
-    final_out=apply_mask(temp_in,mask_path,-9999,output_dir)
+    final_out=apply_mask(temp_in,mask_path,-9999,output_dir, output_name)
     
-    print(get_stats_raster(final_out))
+    #print(get_stats_raster(final_out))
 
 
-def run_pipeline_directory(input_dir, output_dir):
+def run_pipeline_directory(input_dir,mask_path,new_crs,new_extent,resolution,s_crs, t_crs, output_dir,temp_dir=None):
     rasters = []
 
     # Iterate directory 
@@ -291,7 +343,7 @@ def run_pipeline_directory(input_dir, output_dir):
     
     for raster in rasters:
         temp_in=os.path.join(input_dir,raster)
-        run_pipeline(temp_in,new_crs,wgs_crs,path_mask1,path_mask250, temp_dir, output_dir)
+        run_pipeline(temp_in,mask_path,new_crs,new_extent, resolution, s_crs, t_crs, output_dir,temp_dir=None)
 
     #Now I need the stats of the files I just processed.
     #Therefore, the output_dir becomes the new input_dir for the stats function
@@ -299,7 +351,7 @@ def run_pipeline_directory(input_dir, output_dir):
 
     get_stats_directory(input_dir)
 
-def create_mask(infile_path,output_dir,crs,extent):
+def create_mask(infile_path,output_dir,crs,extent,resolution):
     
     temp_dir=os.path.join(output_dir,"temp")
 
@@ -332,7 +384,7 @@ def create_mask(infile_path,output_dir,crs,extent):
     #Reproject the mask to resolution of 10km
     temp_in=temp_out
     print(f"\nReprojecting {temp_in}\n")
-    temp_out=reproject(equalearth_crs, res_10k, res_10k,temp_in, output_dir, f"globalmask_ee_{res_10k/1000}km_nodata.tif")
+    temp_out=reproject(equalearth_crs, resolution, resolution,temp_in, output_dir, f"globalmask_ee_{resolution/1000}km_nodata.tif")
 
     #Note: For step 4: NoData value in mask was decided earlier to be -9999
 
@@ -342,26 +394,34 @@ def create_mask(infile_path,output_dir,crs,extent):
 
 if __name__=="__main__":
 
+    # Handled in the arguments
+    #infile_path = "/home/ubuntu/mnt3/soil/71a04c738fde75ee64f57118ed466530/IGBPDIS_SURFPRODS/bulkdens.dat"
+
+    #"/home/ubuntu/mnt3/bio_30s/bio_current_1.tif"
     
-    infile_path = "/home/ubuntu/mnt/Alex/gsdms_alex/temp/bio_current_1.tif"
-    out_folder="/home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/mask"
-    if not os.path.exists(out_folder):
-        os.makedirs(out_folder)
+    #input_dir="/home/ubuntu/mnt3/bio_30s/"
+    #mask_path="/home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/10km/globalmask_ee_10.0km_nodata.tif"
+    #output_dir="/home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/10km/bio_current/"
+    #if not os.path.exists(output_dir):
+    #    os.makedirs(output_dir)
 
     #Mask creation
-    #mask_path=create_mask(infile_path,out_folder, new_crs,new_extent)
+    #mask_path=create_mask(infile_path,output_dir, new_crs,new_extent, res)
     #print(get_stats_raster(mask_path))
 
     #print(get_stats_raster("/home/ubuntu/mnt/Alex/gsdms_alex/temp/mask/globalmask_ee_10km_nodata.tif"))
 
     
     #######Layers processing
-    infile_path="/home/ubuntu/mnt3/soil/71a04c738fde75ee64f57118ed466530/IGBPDIS_SURFPRODS/data/bulkdens_wgs.tif"
-    output_dir="/home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/10km/"
-
-    run_pipeline(infile_path, new_crs, new_extent, res_10k, wgs_crs, equalearth_crs, output_dir, temp_dir=None)
+    #Runs all inside a directory
+    run_pipeline_directory(input_file_path,mask_path, new_crs, new_extent, res, wgs_crs, equalearth_crs, output_dir, temp_dir=None)
     
-    print(get_stats_raster("/home/ubuntu/mnt3/outputs/layers_10k/soil/bulkdens_wgs_ee.tif"))
+    #Runs only one file at a time
+    #run_pipeline(input_file_path,mask_path,new_crs, new_extent, res, wgs_crs, equalearth_crs, output_dir, temp_dir=None) #TODO put this in an if
+    
+    
+    
+    #print(get_stats_raster("/home/ubuntu/mnt3/outputs/layers_10k/soil/bulkdens_wgs_ee.tif"))
     
     #print(get_stats_raster("/home/ubuntu/mnt/Alex/gsdms_alex/temp/proclay/bulkdens_wgs_clip_reproj_clip2nodata_masked.tif"))
     

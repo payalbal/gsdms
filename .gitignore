@@ -11,3 +11,6 @@ commented_aus_processing.r
 Covariate data processing for global .r
 prueba
 .vscode
+run_biofut.sh
+run_biofut_1km.sh
+run_dist.sh
