@@ -4,11 +4,10 @@
 
 ## NOTES FOR ALEJANDRO:
 ## Search $$ for specific notes where something needs to be fixed or noted
-## I have included outputs of sprtinf inn the script as i use this fuction to create my function call i.e. text string (ref for sprintf: https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/sprintf)
+## I have included outputs of sprtinf in the script as I use this function to create my function call i.e. text string (ref for sprintf: https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/sprintf)
 ## I have commented out the 'Calculate distance layers' section. Skip this. I have left it in, in case we need to recreate the distance layers
-## Run script till L556
-## This script lists the steps needed for processing of global layers; use it to understand the steps but you needn't stick to the exact text strings and the solutions found therein. There are mutoiple ways to skin a cat they say, so feel free to use the appropriate approach as long as we get tot he desired result :)
-## Task 3 will be to then go onto the landuse layer processing, i.e. L566 onwards. We'll discuss this when we come to it. 
+## This script lists the steps needed for processing of global layers; use it to understand the steps but you needn't stick to the exact text strings and the solutions found therein. There are multiple ways to skin a cat they say, so feel free to use the appropriate approach as long as we get tot he desired result :)
+
 
 
 ## ------------------------------------------------------------------------- ##
@@ -375,7 +374,7 @@ dst_layers <- list.files(file.path(gsdms_dir, "distance_layers_wgs"),
 ## >> >> Current climate (worldclim) layers
 bio_current <- list.files(file.path(gsdms_dir, "worldclim", "current", "wc2.1_30s_bio"), full.names = TRUE)
 
-## >> >> Future climate (worldclim) layers ####
+## >> >> Future climate (worldclim) layers
 ssps <- c("ssp1", "ssp3", "ssp5")
 bio_future <- list.files(file.path(skip_dir, "exp_alex/out"), 
                          pattern = paste0(ssps, collapse = "|"), 
@@ -563,20 +562,79 @@ file.rename(infile, gsub("srtm", "elevation", infile))
 
 
 ## ------------------------------------------------------------------------- ##
-## $$ TO FIX - Prepare land use layers ####
+## Prepare land use layers ####
 ## ------------------------------------------------------------------------- ## 
 ## Hurtt data: https://luh.umd.edu/
 
-## $$ Note for Alejandro: IGNORE for now, we will tackle this as TASK 3 :)
+## >> Current Hurtt data: 2015 ####
+## >> >> Specify an output folder ####
+hurtt_out <- file.path(gsdms_dir, "outputs", "landuse_hurtt_2015")
+if(!dir.exists(hurtt_out)) {
+  dir.create(hurtt_out)
+}
+# file.remove(list.files(hurtt_out, full.names = TRUE))
 
-## >> Future: 2015 - 2100 (86 time steps) ####
+
+## >> >> Explore nccdf input files ####
+## $$ NOTE: We're using the ncdf4 R package here, use it if you want to view 
+##  the files in R. The following are only some examples of functions in 
+##  the package, there are more. 
+## Package can be downloaded here: https://cran.r-project.org/web/packages/ncdf4/index.html
+## Package documentation here: https://cran.r-project.org/web/packages/ncdf4/ncdf4.pdf
+infile = list.files(file.path(gsdms_dir, "landuse/hurtt/LUH2/LUH2_v2h"), 
+                    pattern = ".nc$", full.names = TRUE)
+lu <- ncdf4::nc_open(infile, write=FALSE, readunlim=FALSE, 
+                     verbose=FALSE,auto_GMT=TRUE, 
+                     suppress_dimvals=FALSE)
+temp <- ncvar_get(lu, varid = "primf", 
+                  start = NA, count = NA, 
+                  verbose=FALSE,
+                  signedbyte=TRUE, 
+                  collapse_degen=TRUE, 
+                  raw_datavals=TRUE )
+str(temp)
+
+
+## >> >> Specify land use categories used in the dataset ####
+luvars <- c("primf", "primn", "secdf", "secdn", "urban", "pastr", "range", "crop" )
+
+
+## >> >> Step one_Extract layers year (2015 only) ####
+system("bash /tempdata/workdir/gsdms/scripts/extract_nc_hurtt_2015.sh")
+
+## Check files
+length(list.files(hurtt_out))
+x <- list.files(hurtt_out, full.names = TRUE)
+raster(x[1])
+plot(raster(x[1]))
+
+
+## >> >> Step two_Rename files by year of time slice ####
+x <- list.files(hurtt_out, full.names = TRUE, pattern = paste0("t", t.idx.py, ".nc$"))
+y <- gsub(paste0("t", t.idx.py, ".nc$"), paste0("t", t.steps, ".nc"), x)
+file.rename(x, y)
+
+
+## >> >> Step three_Aggregate crop layers ####
+## $$ This step combines the 5 crop layers (i.e.'c3ann', 'c4ann', 'c3per', 
+##  'c4per', 'c3nfx') into a single 'crop' layer by taking the max value 
+##  out of the 5 layers for each pixel
+## see https://stackoverflow.com/questions/10129561/how-to-find-max-values-from-multiple-lists
+system("bash /tempdata/workdir/gsdms/scripts/max_nc_hurtt_2015.sh")
+
+
+
+
+## >> Future Hurtt data: 2015 - 2100 (86 time steps) ####
+## >> >> Specify an output folder ####
 hurtt_out <- file.path(gsdms_dir, "outputs", "landuse_hurtt_future")
 if(!dir.exists(hurtt_out)) {
   dir.create(hurtt_out)
 }
 # file.remove(list.files(hurtt_out, full.names = TRUE))
 
-## Explore Hurtt input files
+
+## >> >> Explore nccdf input files ####
 infiles = list.files(file.path(gsdms_dir, "landuse/Hurtt"), 
                      pattern = ".nc$", full.names = TRUE)
 
@@ -595,17 +653,22 @@ temp <- ncvar_get(lu, varid = "primf",
                   raw_datavals=TRUE )
 str(temp)
 
-## Specify land use categories in data
+
+## >> >> Specify land use categories used in the dataset ####
+## $$ same as before
 luvars <- c("primf", "primn", "secdf", "secdn", "urban", "pastr", "range", "crop" )
 
-## Specify time steps and index
+
+## >> >> Specify time steps and indices ####
+## $$ NOTES that we will create outputs for: 
+##  2015 2020 2025 2030 2035 2040 2045 2050 2055 2060 2065 2070
 t.all <- seq(2015, 2100, 1)
-t.steps <- seq(2015, 2070, 5)
+t.steps <- seq(2015, 2070, 5) 
 t.idx <- which(t.all %in% t.steps)
 t.idx.py <- t.idx - 1 ## as per python indices
 
 
-## >> >> step one_Extract layers by ssp, land use and year ####
+## >> >> Step one_Extract layers by ssp, land use and year ####
 system("bash /tempdata/workdir/gsdms/scripts/extract_nc.sh")
 
 ## Check files
@@ -615,7 +678,7 @@ raster(x[1])
 plot(raster(x[1]))
 
 
-## >> >> step two_Rename files by year of time slice ####
+## >> >> Step two_Rename files by year of time slice ####
 for (i in 1:length(t.idx.py)){
   x <- list.files(hurtt_out, full.names = TRUE, pattern = paste0("t", t.idx.py[i], ".nc$"))
   y <- gsub(paste0("t", t.idx.py[i], ".nc$"), paste0("t", t.steps[i], ".nc"), x)
@@ -623,125 +686,61 @@ for (i in 1:length(t.idx.py)){
 }
 
 
-## >> >> step three_Aggregate crop layers ####
+## >> >> Step three_Aggregate crop layers ####
 system("bash /tempdata/workdir/gsdms/scripts/max_nc.sh")
 
 
-## >> >> step four_Reproject to Equal Earth ####
-infile <- list.files(hurtt_out, 
-                     pattern = paste0(luvars, collapse = "|"), 
-                     full.names = TRUE)
-length(infile) == length(luvars)*12*3 ## number of variables *  number of time steps * number of scenarios
-gdalUtils::gdalinfo(infile[1])
-raster(infile[1])
-
-outfile <- file.path(output_dir, paste0("hurtt_", basename(tools::file_path_sans_ext(infile)), ".tif"))
-new_res <- proj_res
-new_crs = equalearth_crs
-
-parallel::mclapply(seq_along(infile),
-                   function(x) system(paste0("gdalwarp -overwrite -ot Float32 -r bilinear -tr ",
-                                             paste(new_res, collapse = " "),
-                                             " -s_srs '", wgs_crs, "'",
-                                             " -t_srs '", new_crs, "' ",
-                                             infile[x], " ", outfile[x])),
-                   mc.cores = mc.cores, mc.preschedule = TRUE)
-## Note warning: Warning 1: No UNIDATA NC_GLOBAL:Conventions attribute
-
-raster(infile[1])
-raster(outfile[1])
-raster(file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km)))
-## Check extent with maskfile
-
-
-## >> >> step five_Mask layers ####
-## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R
-infile <- outfile
-outfile <- sub(".tif", "_ee.tif", outfile)
-mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))
-
-gdalUtils::gdalinfo(infile[1])
-gdalUtils::gdalinfo(mask_file)
-parallel::mclapply(seq_along(infile),
-                   function(x) system(paste0("gdal_calc.py -A ", infile[x], " -B ", mask_file,
-                                             " --calc='((B==1)*A)+(-9999*(B!=1))' --NoDataValue=-9999",
-                                             " --outfile=", outfile[x])),
-                   mc.cores = mc.cores, mc.preschedule = TRUE)
-gdalUtils::gdalinfo(outfile[1])
-file.remove(infile)
-
-
-
-## >> Current: 2015 ####
-hurtt_out <- file.path(gsdms_dir, "outputs", "landuse_hurtt_2015")
-if(!dir.exists(hurtt_out)) {
-  dir.create(hurtt_out)
-}
-
-# file.remove(list.files(hurtt_out, full.names = TRUE))
-infile = list.files(file.path(gsdms_dir, "landuse/hurtt/LUH2/LUH2_v2h"), 
-                    pattern = ".nc$", full.names = TRUE)
-lu <- ncdf4::nc_open(infile, write=FALSE, readunlim=FALSE, 
-                     verbose=FALSE,auto_GMT=TRUE, 
-                     suppress_dimvals=FALSE)
-temp <- ncvar_get(lu, varid = "primf", 
-                  start = NA, count = NA, 
-                  verbose=FALSE,
-                  signedbyte=TRUE, 
-                  collapse_degen=TRUE, 
-                  raw_datavals=TRUE )
-str(temp)
-
-## Specify time steps and index
-t.all <- seq(850, 2015, 1)
-t.steps <- 2015
-t.idx <- which(t.all %in% "2015")
-t.idx.py <- t.idx - 1 ## as per python indices
+  ## >> Run data processing steps on Hurtt (current and future) data ####
+  ## $$ NOTE that this is the same as the steps you've developed and run previously.
+  ##  Data processing steps being previously run on the hurtt layers are commented below.
+  ##  Feel free to ignore this. I've left them in in case you need to refer to it.
+  
+  # ## Step four_Reproject to Equal Earth
+  # infile <- list.files(hurtt_out,
+  #                      pattern = paste0(luvars, collapse = "|"),
+  #                      full.names = TRUE)
+  # length(infile) == length(luvars)*12*3 ## number of variables *  number of time steps * number of scenarios
+  # 
+  # outfile <- file.path(output_dir, paste0("hurtt_", basename(tools::file_path_sans_ext(infile)), ".tif"))
+  # new_res <- proj_res
+  # new_crs = equalearth_crs
+  # 
+  # parallel::mclapply(seq_along(infile),
+  #                    function(x) system(paste0("gdalwarp -overwrite -ot Float32 -r bilinear -tr ",
+  #                                              paste(new_res, collapse = " "),
+  #                                              " -s_srs '", wgs_crs, "'",
+  #                                              " -t_srs '", new_crs, "' ",
+  #                                              infile[x], " ", outfile[x])),
+  #                    mc.cores = mc.cores, mc.preschedule = TRUE)
+  # ## Note warning: Warning 1: No UNIDATA NC_GLOBAL:Conventions attribute
+  # 
+  # ## Checks
+  # gdalUtils::gdalinfo(infile[1])
+  # gdalUtils::gdalinfo(outfile[1])
+  # gdalUtils::gdalinfo(mask_file) ## check extent with maskfile
+  # 
+  # raster(infile[1])
+  # raster(outfile[1])
+  # raster(file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))) ## check extent with maskfile
+  # 
+  # 
+  # ## >> >> Step five_Mask layers
+  # ## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R
+  # infile <- outfile
+  # outfile <- sub(".tif", "_ee.tif", outfile)
+  # mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))
+  # 
+  # parallel::mclapply(seq_along(infile),
+  #                    function(x) system(paste0("gdal_calc.py -A ", infile[x], " -B ", mask_file,
+  #                                              " --calc='((B==1)*A)+(-9999*(B!=1))' --NoDataValue=-9999",
+  #                                              " --outfile=", outfile[x])),
+  #                    mc.cores = mc.cores, mc.preschedule = TRUE)
+  # 
+  # gdalUtils::gdalinfo(infile[1])
+  # gdalUtils::gdalinfo(mask_file)
+  # gdalUtils::gdalinfo(outfile[1])
+  # file.remove(infile)
 
 
-## >> >> step one_Extract layers year (2015 only) ####
-system("bash /tempdata/workdir/gsdms/scripts/extract_nc_hurtt_2015.sh")
 
 
-## >> >> step two_Rename files by year of time slice ####
-x <- list.files(hurtt_out, full.names = TRUE, pattern = paste0("t", t.idx.py, ".nc$"))
-y <- gsub(paste0("t", t.idx.py, ".nc$"), paste0("t", t.steps, ".nc"), x)
-file.rename(x, y)
-
-
-## >> >> step three_Aggregate crop layers ####
-system("bash /tempdata/workdir/gsdms/scripts/max_nc_hurtt_2015.sh")
-
-
-## >> >> step four_Reproject to Equal Earth ####
-infile <- list.files(hurtt_out, 
-                     pattern = paste0(luvars, collapse = "|"), 
-                     full.names = TRUE)
-length(infile) == length(luvars) ## number of variables
-
-outfile <- file.path(output_dir, paste0("hurtt_", basename(tools::file_path_sans_ext(infile)), ".tif"))
-new_res <- proj_res
-
-parallel::mclapply(seq_along(infile),
-                   function(x) system(paste0("gdalwarp -overwrite -ot Float32 -r bilinear -tr ",
-                                             paste(new_res, collapse = " "),
-                                             " -s_srs '", wgs_crs, "'",
-                                             " -t_srs '", new_crs, "' ",
-                                             infile[x], " ", outfile[x])),
-                   mc.cores = mc.cores, mc.preschedule = TRUE)
-file.exists(outfile)
-
-
-## >> >> step five_Mask layers ####
-## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R
-infile <- outfile
-outfile <- sub(".tif", "_ee.tif", outfile)
-mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))
-
-parallel::mclapply(seq_along(infile),
-                   function(x) system(paste0("gdal_calc.py -A ", infile[x], " -B ", mask_file,
-                                             " --calc='((B==1)*A)+(-9999*(B!=1))' --NoDataValue=-9999",
-                                             " --outfile=", outfile[x])),
-                   mc.cores = mc.cores, mc.preschedule = TRUE)
-file.exists(outfile)
-file.remove(infile)
