@@ -656,7 +656,7 @@ raster(file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km)))
 
 
 ## >> >> step five_Mask layers ####
-## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/thisblob/master/gdal_calc.R
+## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R
 infile <- outfile
 outfile <- sub(".tif", "_ee.tif", outfile)
 mask_file <- file.path(output_dir, sprintf("globalmask_%sk_ee.tif", proj.res.km))

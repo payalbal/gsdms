@@ -15,12 +15,13 @@ import subprocess
 from rasterstats import zonal_stats
 
 import argparse
+
 parser= argparse.ArgumentParser(description='Program to generate australian future bioclim from global future bioclim')
 parser.add_argument('-i','--input_file_path', type=str, metavar='', help='specify the folder where the tif files to be averaged are')
 parser.add_argument('-m','--mask_path', type=str, metavar='', help='specify the folder where the tif files to be averaged are')
 parser.add_argument('-o','--output_directory', type=str, metavar='', help='specify the folder where the resulting file will be stored')
 parser.add_argument('-r','--resolution', type=int, metavar='', help='desired resolution in meters')
-
+parser.add_argument('-pd','--process_directory', action='store_true')
 args = parser.parse_args()
 
 
@@ -266,6 +267,33 @@ def apply_mask(infile_path, mask_path, no_data_val, outfolder, out_name=None):
 
     return outfile_path
 
+def separate_srtm(infile_path, outfolder):
+
+    #Gets slope from srtm
+    out_filename=add_suffix_step(infile_path,"_slope.tif")
+    outfile_path=os.path.join(outfolder,out_filename)
+    os.system(f"gdaldem slope {infile_path} {outfile_path}")
+
+    #Gets aspect from srtm
+    out_filename=add_suffix_step(infile_path,"_aspect.tif")
+    outfile_path=os.path.join(outfolder,out_filename)
+    os.system(f"gdaldem aspect {infile_path} {outfile_path}")
+
+    #Gets terrain from srtm
+    out_filename=add_suffix_step(infile_path,"_terrain.tif")
+    outfile_path=os.path.join(outfolder,out_filename)
+    os.system(f"gdaldem TRI {infile_path} {outfile_path}")
+
+    #Gets rougghness from srtm
+    out_filename=add_suffix_step(infile_path,"_roughness.tif")
+    outfile_path=os.path.join(outfolder,out_filename)
+    os.system(f"gdaldem roughness {infile_path} {outfile_path}")
+
+    #renames srtm to srtm_elevation.tif
+    out_filename=add_suffix_step(infile_path,"_elevation.tif")
+    outfile_path=os.path.join(outfolder,out_filename)
+    os.system(f"mv {infile_path} {outfile_path}")
+
 
 def run_pipeline(infile_path,mask_path,new_crs,new_extent, resolution, s_crs, t_crs, output_path,temp_dir=None):
     '''
@@ -296,13 +324,10 @@ def run_pipeline(infile_path,mask_path,new_crs,new_extent, resolution, s_crs, t_
             temp_out = translate(new_crs, temp_in, temp_dir)
             temp_in=temp_out
 
-
-
     ## >> Step two_Reduce layer extent, as specified in WGS 84 ####
     
     print("\n Setting extent \n")
     temp_out=set_extent(new_extent,temp_in,temp_dir)# TODO change this to temp_out after coding step 1
-
 
     ## >> Step three_Reproject layer to Equal earth ####
     temp_in=temp_out
@@ -328,6 +353,11 @@ def run_pipeline(infile_path,mask_path,new_crs,new_extent, resolution, s_crs, t_
     ## https://gitlab.unimelb.edu.au/garberj/gdalutilsaddons/-/blob/master/gdal_calc.R    
     temp_in=temp_out
     final_out=apply_mask(temp_in,mask_path,-9999,output_dir, output_name)
+    
+    # The following step only runs for srtm:
+    print("\n Creating separate files for SRTM variables... \n")
+    if "srtm" in str(final_out):
+        separate_srtm(final_out,output_dir)
     
     #print(get_stats_raster(final_out))
 
@@ -392,6 +422,8 @@ def create_mask(infile_path,output_dir,crs,extent,resolution):
     temp_in=infile_path
 
 
+
+
 if __name__=="__main__":
 
     # Handled in the arguments
@@ -413,13 +445,15 @@ if __name__=="__main__":
 
     
     #######Layers processing
-    #Runs all inside a directory
-    run_pipeline_directory(input_file_path,mask_path, new_crs, new_extent, res, wgs_crs, equalearth_crs, output_dir, temp_dir=None)
+
+    if args.process_directory:
+        #Runs all inside a directory
+        run_pipeline_directory(input_file_path,mask_path, new_crs, new_extent, res, wgs_crs, equalearth_crs, output_dir, temp_dir=None)
+    else:
+        #Runs only one file at a time
+        run_pipeline(input_file_path,mask_path,new_crs, new_extent, res, wgs_crs, equalearth_crs, output_dir, temp_dir=None) #TODO put this in an if
     
-    #Runs only one file at a time
-    #run_pipeline(input_file_path,mask_path,new_crs, new_extent, res, wgs_crs, equalearth_crs, output_dir, temp_dir=None) #TODO put this in an if
-    
-    
+    #separate_srtm("/home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/1km/srtm/srtm_processed.tif","/home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/1km/srtm/" )
     
     #print(get_stats_raster("/home/ubuntu/mnt3/outputs/layers_10k/soil/bulkdens_wgs_ee.tif"))
     
