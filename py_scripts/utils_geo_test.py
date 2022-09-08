@@ -269,6 +269,8 @@ def apply_mask(infile_path, mask_path, no_data_val, outfolder, out_name=None):
 
 def separate_srtm(infile_path, outfolder):
 
+    print("\n Creating separate files for SRTM variables.. \n")
+
     #Gets slope from srtm
     out_filename=add_suffix_step(infile_path,"_slope.tif")
     outfile_path=os.path.join(outfolder,out_filename)
@@ -355,7 +357,7 @@ def run_pipeline(infile_path,mask_path,new_crs,new_extent, resolution, s_crs, t_
     final_out=apply_mask(temp_in,mask_path,-9999,output_dir, output_name)
     
     # The following step only runs for srtm:
-    print("\n Creating separate files for SRTM variables... \n")
+    
     if "srtm" in str(final_out):
         separate_srtm(final_out,output_dir)
     
@@ -451,6 +453,9 @@ if __name__=="__main__":
         run_pipeline_directory(input_file_path,mask_path, new_crs, new_extent, res, wgs_crs, equalearth_crs, output_dir, temp_dir=None)
     else:
         #Runs only one file at a time
+        # sample command
+        #python3 utils_geo_test.py -i /home/ubuntu/mnt/Alex/gsdms_alex/outputs/out_ssp126_2021-2040/bio5_ssp126_2021-2040.tif -m /home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/10km/mask/globalmask_ee_10.0km_nodata.tif -o /home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/prueba_sep/ -r 10000
+        #python3 utils_geo_test.py -i /home/ubuntu/gsdm_mnt/srtm/mn30_grd/srtm.adf -m /home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/10km/mask/globalmask_ee_10.0km_nodata.tif -o /home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/prueba_sep/ -r 10000
         run_pipeline(input_file_path,mask_path,new_crs, new_extent, res, wgs_crs, equalearth_crs, output_dir, temp_dir=None) #TODO put this in an if
     
     #separate_srtm("/home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/1km/srtm/srtm_processed.tif","/home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/1km/srtm/" )
@@ -464,7 +469,6 @@ if __name__=="__main__":
     #print(get_stats_raster("/home/ubuntu/mnt3/outputs/layers_10k/soil/bulkdens_wgs_ee.tif"))
 
     
-
     
 
 
