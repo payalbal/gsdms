@@ -374,6 +374,8 @@ def run_pipeline_directory(input_dir,mask_path,new_crs,new_extent,resolution,s_c
         # check only .tif files
         if file.endswith('.tif'):
             rasters.append(file)
+        elif file.endswith('.nc'):
+            rasters.append(file)
     
     for raster in rasters:
         temp_in=os.path.join(input_dir,raster)
@@ -453,7 +455,8 @@ if __name__=="__main__":
     if args.process_directory:
         #Runs all inside a directory
         #sample command
-        #python3 utils_geo_test.py -i /home/ubuntu//gsdm_mnt/outputs/landuse_hurtt_future -m /home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/10km/mask/globalmask_ee_10.0km_nodata.tif -o /home/ubuntu/mnt/Alex/gsdms_alex/outputs/t3_out/10km/landuse_hurtt_future/ -r 10000 -pd
+        #python3 utils_geo_test.py -i /home/ubuntu/gsdm_mnt/outputs/landuse_hurtt_future/ -m /home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/10km/mask/globalmask_ee_10.0km_nodata.tif -o /home/ubuntu/mnt/Alex/gsdms_alex/outputs/t3_out/10km/landuse_hurtt_future/ -r 10000 -pd
+        #python3 utils_geo_test.py -i /home/ubuntu/gsdm_mnt/outputs/landuse_hurtt_future/ -m /home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/1km/mask/globalmask_ee_1.0km_nodata.tif -o /home/ubuntu/mnt/Alex/gsdms_alex/outputs/t3_out/1km/landuse_hurtt_future/ -r 1000 -pd
         run_pipeline_directory(input_file_path,mask_path, new_crs, new_extent, res, wgs_crs, equalearth_crs, output_dir, temp_dir=None)
     else:
         #Runs only one file at a time
