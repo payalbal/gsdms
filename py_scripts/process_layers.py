@@ -10,9 +10,9 @@ import operator
 import time
 import ntpath
 import sys
-import subprocess
+import subprocess #Used for stats
 
-from rasterstats import zonal_stats
+from rasterstats import zonal_stats #Used for stats
 
 import argparse
 
@@ -117,8 +117,6 @@ def get_shapefile(infile_path):
     call = f"gdaltindex {outfile_path} {infile_path}"
     os.system(call)
 
-    
-
     return outfile_path
 
 
@@ -130,7 +128,6 @@ def get_stats_raster(infile_path, silent=True):
     stats = zonal_stats(shapefile_path, infile_path, stats=['min', 'max', 'median', 'majority', 'range' , 
                                                             'nodata', 'percentile_25.0', 'percentile_75.0'])
     
-
     # Deletes .shp, .dbf, .prj and .shx files
     target_dir=os.path.dirname(infile_path)
     junk_extensions=[".dbf",".prj",".shx",".shp"]
@@ -185,7 +182,7 @@ def get_stats_directory(input_dir, output_dir=None, report_name=None):
                 stats=get_stats_raster(file_to_stats)
                 for key, value in stats.items():
                     f.write(f'{key} : ')
-                    f.write(f'{value}')
+                    f.write(f'{value}\n')
             except Exception as e:
                 print(f"exception when doing stats for:{filename}")
                 print(e)
@@ -397,16 +394,19 @@ def run_pipeline_directory(input_dir,mask_path,new_crs,new_extent,resolution,s_c
         # check only .tif files
         if file.endswith('.tif'):
             rasters.append(file)
-            in_path_rasters(os.path.join(input_dir,file))
+            print(f"\n input dir is \n{input_dir} \n")
+            print(f"\n infile is \n{file} \n")
+            in_path_rasters.append(os.path.join(input_dir,file))
         elif file.endswith('.nc'):
             rasters.append(file)
-            in_path_rasters(os.path.join(input_dir,file))
+            in_path_rasters.append(os.path.join(input_dir,file))
     
     #Generate stats for input rasters
-    get_stats_directory(input_dir)
+    #get_stats_directory(input_dir)
     
     for raster in in_path_rasters:
-        run_pipeline(temp_in,mask_path,new_crs,new_extent, resolution, s_crs, t_crs, output_dir,temp_dir=None)
+        print("\n Processing  is: \n",raster,"\n")
+        run_pipeline(raster,mask_path,new_crs,new_extent, resolution, s_crs, t_crs, output_dir,temp_dir=None)
 
     #Now I need the stats of the files I just processed.
     #Therefore, the output_dir becomes the new input_dir for the stats function
@@ -503,8 +503,8 @@ if __name__=="__main__":
         #sample command ...
         #python3 utils_geo_test.py -i /home/ubuntu/gsdm_mnt/outputs/landuse_hurtt_future/ -m /home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/10km/mask/globalmask_ee_10.0km_nodata.tif -o /home/ubuntu/mnt/Alex/gsdms_alex/outputs/t3_out/10km/landuse_hurtt_future/ -r 10000 -pd
         #python3 utils_geo_test.py -i /home/ubuntu/gsdm_mnt/outputs/landuse_hurtt_future/ -m /home/ubuntu/mnt/Alex/gsdms_alex/outputs/t2_out/1km/mask/globalmask_ee_1.0km_nodata.tif -o /home/ubuntu/mnt/Alex/gsdms_alex/outputs/t3_out/1km/landuse_hurtt_future/ -r 1000 -pd
-        #TODO uncommetthis after stats for inputs run_pipeline_directory(input_file_path,mask_path, new_crs, new_extent, res, wgs_crs, equalearth_crs, output_dir, temp_dir=None)
-        get_stats_directory(input_file_path, output_dir=output_dir, report_name="report_inputs.txt")
+        run_pipeline_directory(input_file_path,mask_path, new_crs, new_extent, res, wgs_crs, equalearth_crs, output_dir, temp_dir=None)
+        #get_stats_directory(input_file_path, output_dir=output_dir, report_name="report_inputs.txt")
     else:
         print("doing nothing")
         #Runs only one file at a time
