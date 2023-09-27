@@ -1,0 +1,36 @@
+Spatial data processing in QGIS
+
+## DISTANCE TO WATER LAYER (including coastline, lakes, rivers)
+## source: https://www.ngdc.noaa.gov/mgg/shorelines/
+
+
+1. From the GSHHS_shp folder import  levels 1 and 2* into QGIS
+2. Run the 'Difference' function in 'Vector overlay' toolbox. If the process doesn't run due to 'invalid input features error' see: https://gis.stackexchange.com/questions/289056/ignoring-invalid-input-features-with-intersection-tool-in-qgis
+3.
+
+
+* Level 1: Continental land masses and ocean islands, except Antarctica; Level 2: Lakes
+
+WDBII_shp
+
+
+
+
+
+
+
+
+
+
+
+## ----------------------------------------------------------------------------------------------------------------
+## NOTES
+Converting geodatabse to shapefile in QGIS using GDAL
+https://gis.ucla.edu/node/53
+
+
+QGIS error when converting geodatabse to shapefile "ogr2ogr: command not found"
+See: https://gis.stackexchange.com/questions/276853/gdal-scripts-not-found-in-qgis-3-on-osx
+
+
+

@@ -2,7 +2,6 @@
 ##########################
 docs/
 scripts/connect_to_server.R
-scripts/archive/
 scripts/job*
 
 # R files #
